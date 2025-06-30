@@ -19,6 +19,16 @@ ExportHeader *GetExportHeaderFromCard(int slot, char *fileName, void *buffer);
 int CSS_ID(int ext_id);
 int GetSelectedFighterIdOnCssForHmn();
 
+int testThinkPhase;
+
+void Test_Cam_Think(GOBJ *button_gobj)
+{
+	if (import_data.menu_gobj == NULL)
+	{
+		import_data.menu_gobj = Menu_Create();
+	}
+}
+
 void Test_Think_SelCard(GOBJ *menu_gobj)
 {
 	int myCardIndex = 0;
@@ -63,7 +73,8 @@ void Test_Think_SelCard(GOBJ *menu_gobj)
 	if (import_data.memcard_inserted[myCardIndex])//import_data.cursor])
 	{
 		import_data.memcard_slot = myCardIndex;//import_data.cursor;
-		SFX_PlayCommon(1);
+		testThinkPhase++;
+		//SFX_PlayCommon(1);
 		Menu_SelCard_Exit(menu_gobj);
 		Menu_SelFile_Init(menu_gobj);
 	}
@@ -101,6 +112,8 @@ void Test_Think_SelFile(GOBJ *menu_gobj)
 		kind = CFRM_NEW;
 	else if (vers < REC_VERS)
 		kind = CFRM_OLD;
+
+	++testThinkPhase;
 
 	// open confirm dialog
 	Menu_Confirm_Init(menu_gobj, kind);
@@ -167,7 +180,18 @@ void Test_Think_Confirm(GOBJ *menu_gobj)
 
 void Test_Think(GOBJ *menu_gobj)
 {
-	Test_Think_SelCard(menu_gobj);
+	switch (testThinkPhase)
+	{
+	case 0:
+		Test_Think_SelCard(NULL);
+		break;
+	case 1:
+		Test_Think_SelFile(NULL);
+		break;
+	case 2:
+		Test_Think_Confirm(NULL);
+		break;
+	}
 }
 
 // OnLoad
@@ -210,7 +234,13 @@ void OnCSSLoad(HSD_Archive *archive)
     event_desc->stage = -1;
     *onload_fileno = -1;
 
-    Cam_Button_Create();
+	testThinkPhase = 0;
+	//GOBJ *button_gobj = GObj_Create(4, 5, 0);
+	//GObj_AddProc(button_gobj, Test_Think, 8);
+	Cam_Button_Create();
+
+
+    //Cam_Button_Create();
     Hazards_Button_Create();
 }
 
@@ -316,7 +346,9 @@ void Cam_Button_Create()
 
 void Cam_Button_Think(GOBJ *button_gobj)
 {
-
+	Test_Cam_Think(button_gobj);
+	//Test_Think(button_gobj);
+	return;
 #define BUTTON_WIDTH 5
 #define BUTTON_HEIGHT 2.2
 

@@ -26,7 +26,7 @@
 #endif
 
 // use TMLog for all logs
-#if TM_DEBUG == 2
+#if TM_DEBUG == 0
 #define OSReport TMLOG
 #endif
 
