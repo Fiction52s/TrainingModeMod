@@ -25,7 +25,18 @@ void Test_Cam_Think(GOBJ *button_gobj)
 {
 	if (import_data.menu_gobj == NULL)
 	{
-		import_data.menu_gobj = Menu_Create();
+		// init state and cursor
+		import_data.menu_state = IMP_SELCARD;
+		import_data.cursor = 0;
+
+		// init memcard inserted state
+		import_data.memcard_inserted[0] = 0;
+		import_data.memcard_inserted[1] = 0;
+
+		GOBJ *menu_gobj = GObj_Create(4, 5, 0);
+		GObj_AddGXLink(menu_gobj, GXLink_Common, MENUCAM_GXLINK, 128);
+		GObj_AddProc(menu_gobj, Menu_Think, 1);
+		//import_data.menu_gobj = Menu_Create();
 	}
 }
 
@@ -77,6 +88,26 @@ void Test_Think_SelCard(GOBJ *menu_gobj)
 		//SFX_PlayCommon(1);
 		Menu_SelCard_Exit(menu_gobj);
 		Menu_SelFile_Init(menu_gobj);
+
+		Read_Recordings();
+		if (import_data.file_num == 0)
+		{
+			/*Menu_Confirm_Init(menu_gobj, CFRM_NONE);
+			SFX_PlayCommon(3);
+			return;*/
+		}
+
+		import_data.menu_state = IMP_SELFILE;
+		import_data.cursor = 0;
+		import_data.page = 0;
+
+		int page_result = Menu_SelFile_LoadPage(menu_gobj, 0);
+		if (page_result == -1)
+		{
+			// create dialog
+			Menu_Confirm_Init(menu_gobj, CFRM_ERR);
+			SFX_PlayCommon(3);
+		}
 	}
 	/*else
 	SFX_PlayCommon(3);*/
@@ -116,7 +147,12 @@ void Test_Think_SelFile(GOBJ *menu_gobj)
 	++testThinkPhase;
 
 	// open confirm dialog
-	Menu_Confirm_Init(menu_gobj, kind);
+	//Menu_Confirm_Init(menu_gobj, kind);
+
+	import_data.confirm.cursor = 0;
+	import_data.menu_state = IMP_CONFIRM;
+	import_data.confirm.kind = kind;
+
 	//SFX_PlayCommon(1);
 }
 
@@ -534,7 +570,7 @@ void Menu_Destroy(GOBJ *menu_gobj)
 void Menu_Think(GOBJ *menu_gobj)
 {
 
-    *stc_css_delay = 2;
+    *stc_css_delay = 0;//2
 
     switch (import_data.menu_state)
     {
