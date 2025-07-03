@@ -5991,7 +5991,6 @@ void Event_Init(GOBJ *gobj)
     GOBJ *cpu = Fighter_GetGObj(1);
     FighterData *cpu_data = cpu->userdata;
     GObj_AddProc(gobj, Event_PostThink, 20);
-
     // Init runtime options...
     
     // advanced counter options
@@ -6941,3 +6940,7 @@ static bool CheckHasJump(GOBJ *g) {
 
     return jumps_used < max_jumps;
 }
+
+
+
+

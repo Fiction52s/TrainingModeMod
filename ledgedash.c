@@ -567,7 +567,7 @@ void Ledgedash_ResetThink(LedgedashData *event_data, GOBJ *hmn)
     int reset_mode = LdshOptions_Main[OPT_RESET].val;
 
     if (reset_mode == OPTRESET_NONE)
-        return;
+		return;
 
     if (event_data->reset_timer > 0) {
         event_data->reset_timer--;

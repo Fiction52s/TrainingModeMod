@@ -19,10 +19,13 @@ ExportHeader *GetExportHeaderFromCard(int slot, char *fileName, void *buffer);
 int CSS_ID(int ext_id);
 int GetSelectedFighterIdOnCssForHmn();
 
+
+
 int testThinkPhase;
 
 void Test_Cam_Think(GOBJ *button_gobj)
 {
+	OSReport("start cam_think\n");
 	if (import_data.menu_gobj == NULL)
 	{
 		// init state and cursor
@@ -33,17 +36,24 @@ void Test_Cam_Think(GOBJ *button_gobj)
 		import_data.memcard_inserted[0] = 0;
 		import_data.memcard_inserted[1] = 0;
 
-		GOBJ *menu_gobj = GObj_Create(4, 5, 0);
-		GObj_AddGXLink(menu_gobj, GXLink_Common, MENUCAM_GXLINK, 128);
-		GObj_AddProc(menu_gobj, Menu_Think, 1);
+		++testThinkPhase;
+
+		//GOBJ *menu_gobj = GObj_Create(4, 5, 0);
+		//GObj_AddGXLink(menu_gobj, GXLink_Common, MENUCAM_GXLINK, 128);
+		//GObj_AddProc(menu_gobj, Test_Think, 1);
 		//import_data.menu_gobj = Menu_Create();
 	}
+
+	OSReport("end cam_think\n");
 }
 
 void Test_Think_SelCard(GOBJ *menu_gobj)
 {
+	OSReport("start think_selcard\n");
+	bp();
 	int myCardIndex = 0;
 
+	
 	// update memcard info
 	for (int i = 0; i <= 1; i++)
 	{
@@ -80,16 +90,17 @@ void Test_Think_SelCard(GOBJ *menu_gobj)
 		stc_memcard_work->is_done = 0;
 	}
 
+	
 	// check if valid memcard inserted
 	if (import_data.memcard_inserted[myCardIndex])//import_data.cursor])
 	{
 		import_data.memcard_slot = myCardIndex;//import_data.cursor;
 		testThinkPhase++;
 		//SFX_PlayCommon(1);
-		Menu_SelCard_Exit(menu_gobj);
-		Menu_SelFile_Init(menu_gobj);
-
+		//Menu_SelCard_Exit(menu_gobj);
+		//Menu_SelFile_Init(menu_gobj);
 		Read_Recordings();
+
 		if (import_data.file_num == 0)
 		{
 			/*Menu_Confirm_Init(menu_gobj, CFRM_NONE);
@@ -105,16 +116,21 @@ void Test_Think_SelCard(GOBJ *menu_gobj)
 		if (page_result == -1)
 		{
 			// create dialog
-			Menu_Confirm_Init(menu_gobj, CFRM_ERR);
-			SFX_PlayCommon(3);
+			//Menu_Confirm_Init(menu_gobj, CFRM_ERR);
+			//SFX_PlayCommon(3);
 		}
 	}
 	/*else
 	SFX_PlayCommon(3);*/
+	OSReport("end think_selcard\n");
 }
 
 void Test_Think_SelFile(GOBJ *menu_gobj)
 {
+	OSReport("start think_selfile\n");
+	bp();
+
+	
 	// first ensure memcard is still inserted
 	s32 memSize, sectorSize;
 	if (CARDProbeEx(import_data.memcard_slot, &memSize, &sectorSize) != CARD_RESULT_READY)
@@ -130,11 +146,36 @@ void Test_Think_SelFile(GOBJ *menu_gobj)
 		//	goto EXIT;
 		return;
 	}
+	
+	
 
-	int myCursor = 0;
+	int myTestCursor = 0;
+
+	//"Fox 40% Upthrow nodi"
+	//"Fox: Edge-guard 101"
+
+	char test1 [] = "Fox 40% Upthrow nodi";
+	char test2 [] = "Fox: Edge-guard 101";
+	//std::string test1 = "Fox 40% Upthrow nodi";
+	
+	for (int i = 0; i < IMPORT_FILESPERPAGE; ++i)
+	{
+		char *file_name = import_data.header[i].metadata.filename;//import_data.file_info[i].file_name;
+		//if (file_name == test2)//"Fox 40% UpThrow No DI")//"Fox Edge-Guard 101")
+		if (strcmp(file_name, test2) == 0)
+		{
+			OSReport("FOUND IT FOUND IT: %s\n", file_name);
+			myTestCursor = i;
+			break;
+		}
+	}
+
+	OSReport("myTestCursor: %x\n", (u32)myTestCursor);
+
+	import_data.cursor = myTestCursor;
 
 	int kind;                                               // init confirm kind
-	int vers = import_data.header[myCursor].metadata.version; // get version number
+	int vers = import_data.header[myTestCursor].metadata.version; // get version number
 
 															// check if version is compatible with this release
 	if (vers == REC_VERS)
@@ -149,15 +190,20 @@ void Test_Think_SelFile(GOBJ *menu_gobj)
 	// open confirm dialog
 	//Menu_Confirm_Init(menu_gobj, kind);
 
-	import_data.confirm.cursor = 0;
+	import_data.confirm.cursor = myTestCursor;
 	import_data.menu_state = IMP_CONFIRM;
 	import_data.confirm.kind = kind;
 
+	OSReport("end think_selfile\n");
+	bp();
+	
 	//SFX_PlayCommon(1);
 }
 
 void Test_Think_Confirm(GOBJ *menu_gobj)
 {
+	OSReport("start think_confirm\n");
+	bp();
 	// first ensure memcard is still inserted
 	s32 memSize, sectorSize;
 	if (CARDProbeEx(import_data.memcard_slot, &memSize, &sectorSize) != CARD_RESULT_READY)
@@ -168,7 +214,9 @@ void Test_Think_Confirm(GOBJ *menu_gobj)
 		return;
 	}
 
-	import_data.cursor = 0;
+	//import_data.cursor = myTestCursor;
+
+
 	// get variables and junk
 	VSMinorData *css_minorscene = *stc_css_minorscene;
 	int this_file_index = (import_data.page * IMPORT_FILESPERPAGE) + import_data.cursor;
@@ -196,13 +244,18 @@ void Test_Think_Confirm(GOBJ *menu_gobj)
 	css_minorscene->vs_data.match_init.stage = stage_kind;
 	preload->queued.stage = stage_kind;
 
+	
+
 	// load files
 	Preload_Update();
+
+	
 
 	// advance scene
 	*stc_css_exitkind = 1;
 
 	// HUGE HACK ALERT
+	OSReport("Stage: %x\n", (u32)event_desc->stage);
 	event_desc->stage = stage_kind;
 	*onload_fileno = import_data.file_info[this_file_index].file_no;
 	*onload_slot = import_data.memcard_slot;
@@ -211,6 +264,10 @@ void Test_Think_Confirm(GOBJ *menu_gobj)
 	for (int i = 0; i < 4; ++i)
 		stc_css_pad[i].held &= ~PAD_BUTTON_A;
 
+
+
+	OSReport("start think_confirm\n");
+	bp();
 	//SFX_PlayCommon(1);
 }
 
@@ -219,12 +276,15 @@ void Test_Think(GOBJ *menu_gobj)
 	switch (testThinkPhase)
 	{
 	case 0:
-		Test_Think_SelCard(NULL);
+		Test_Cam_Think(NULL);
 		break;
 	case 1:
-		Test_Think_SelFile(NULL);
+		Test_Think_SelCard(NULL);
 		break;
 	case 2:
+		Test_Think_SelFile(NULL);
+		break;
+	case 3:
 		Test_Think_Confirm(NULL);
 		break;
 	}
@@ -233,6 +293,8 @@ void Test_Think(GOBJ *menu_gobj)
 // OnLoad
 void OnCSSLoad(HSD_Archive *archive)
 {
+	OSReport("TESTTESTTEST!\n");
+
     event_vars = *event_vars_ptr;
 
     // get assets from this file
@@ -271,12 +333,9 @@ void OnCSSLoad(HSD_Archive *archive)
     *onload_fileno = -1;
 
 	testThinkPhase = 0;
-	//GOBJ *button_gobj = GObj_Create(4, 5, 0);
-	//GObj_AddProc(button_gobj, Test_Think, 8);
-	Cam_Button_Create();
-
-
-    //Cam_Button_Create();
+	GObj_AddProc(cam_gobj, Test_Think, 1);
+	
+	//Cam_Button_Create();
     Hazards_Button_Create();
 }
 
@@ -325,6 +384,9 @@ void Read_Recordings()
                                 strncmp("TMREC", card_stat.fileName, 5) != 0)
                             continue;
 
+						//OSReport("File: %\tCPU: %x\n", (u32)hmn_data, (u32)cpu_data); card_stat.fileName);//string(card_stat.fileName) + "\n");//"max characters!\n");
+						//OSReport("%s\n", card_stat.gameName);
+
                         if (hmnCSSId != -1)
                         {
                             ExportHeader *header = GetExportHeaderFromCard(slot, card_stat.fileName, buffer);
@@ -356,6 +418,7 @@ void Read_Recordings()
 // Button Functions
 void Cam_Button_Create()
 {
+	OSReport("HMN: %x\tCPU: %x\n", 0, 0);
     // Create GOBJ
     GOBJ *button_gobj = GObj_Create(4, 5, 0);
     GObj_AddGXLink(button_gobj, GXLink_Common, 1, 128);
@@ -382,9 +445,6 @@ void Cam_Button_Create()
 
 void Cam_Button_Think(GOBJ *button_gobj)
 {
-	Test_Cam_Think(button_gobj);
-	//Test_Think(button_gobj);
-	return;
 #define BUTTON_WIDTH 5
 #define BUTTON_HEIGHT 2.2
 
@@ -629,9 +689,6 @@ void Menu_SelCard_Init(GOBJ *menu_gobj)
 }
 void Menu_SelCard_Think(GOBJ *menu_gobj)
 {
-	Test_Think_SelCard(menu_gobj);
-	return;
-
     // update memcard info
     for (int i = 0; i <= 1; i++)
     {
@@ -813,10 +870,6 @@ void Menu_SelFile_Init(GOBJ *menu_gobj)
 }
 void Menu_SelFile_Think(GOBJ *menu_gobj)
 {
-	Test_Think_SelFile(menu_gobj);
-	return;
-
-
     // init
     int down = Pad_GetRapidHeld(*stc_css_hmnport);
 
@@ -1044,9 +1097,10 @@ int Menu_SelFile_LoadPage(GOBJ *menu_gobj, int page)
     result = 1; // set page as toggled
     int slot = import_data.memcard_slot;
 
+
     // update scroll bar position
-    import_data.scroll_top->trans.Y = page * import_data.scroll_bot->trans.Y;
-    JOBJ_SetMtxDirtySub(menu_gobj->hsd_object);
+   // import_data.scroll_top->trans.Y = page * import_data.scroll_bot->trans.Y;
+    //JOBJ_SetMtxDirtySub(menu_gobj->hsd_object);
 
     // free prev buffers
     for (int i = 0; i < IMPORT_FILESPERPAGE; i++)
@@ -1062,7 +1116,7 @@ int Menu_SelFile_LoadPage(GOBJ *menu_gobj, int page)
     // blank out all text
     for (int i = 0; i < IMPORT_FILESPERPAGE; i++)
     {
-        Text_SetText(import_data.filename_text, i, "");
+       // Text_SetText(import_data.filename_text, i, "");
     }
 
     // mount card
@@ -1101,8 +1155,12 @@ int Menu_SelFile_LoadPage(GOBJ *menu_gobj, int page)
                     if (!header)
                         continue;
 
+					//OSReport("Selected file: %s\n", header->metadata.filename);
+
+					//header->metadata.filename matches "Fox Edge-Guard 101" (no .gci), so we can at least get the right files now
+
                     memcpy(&import_data.header[i], header, sizeof(ExportHeader));
-                    Text_SetText(import_data.filename_text, i, header->metadata.filename);
+                    //Text_SetText(import_data.filename_text, i, header->metadata.filename);
                 }
             }
             // unmount
@@ -1267,8 +1325,6 @@ void Menu_Left_Right(int down, u8* cursor)
 
 void Menu_Confirm_Think(GOBJ *menu_gobj)
 {
-	Test_Think_Confirm(menu_gobj);
-	return;
     // init
     int down = Pad_GetRapidHeld(*stc_css_hmnport);
 
