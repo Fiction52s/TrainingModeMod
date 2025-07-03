@@ -154,20 +154,42 @@ void Test_Think_SelFile(GOBJ *menu_gobj)
 	//"Fox 40% Upthrow nodi"
 	//"Fox: Edge-guard 101"
 
+	
+
 	char test1 [] = "Fox 40% Upthrow nodi";
 	char test2 [] = "Fox: Edge-guard 101";
+
+	int test1Index = 0;
+	int test2Index = 0;
 	//std::string test1 = "Fox 40% Upthrow nodi";
 	
 	for (int i = 0; i < IMPORT_FILESPERPAGE; ++i)
 	{
 		char *file_name = import_data.header[i].metadata.filename;//import_data.file_info[i].file_name;
 		//if (file_name == test2)//"Fox 40% UpThrow No DI")//"Fox Edge-Guard 101")
-		if (strcmp(file_name, test2) == 0)
+		if (strcmp(file_name, test1) == 0)
 		{
-			OSReport("FOUND IT FOUND IT: %s\n", file_name);
-			myTestCursor = i;
-			break;
+			//OSReport("FOUND IT FOUND IT: %s\n", file_name);
+			test1Index = i;
+			//break;
 		}
+		else if (strcmp(file_name, test2) == 0)
+		{
+			//OSReport("FOUND IT FOUND IT: %s\n", file_name);
+			test2Index = i;
+			//break;
+		}
+	}
+
+	myTestCursor = test1Index;
+
+	//int down = Pad_GetRapidHeld(*stc_css_hmnport);
+
+	if( HSD_Randi(2) == 1 )
+	//if (down & HSD_BUTTON_DPAD_UP)
+	{
+		myTestCursor = test2Index;
+		OSReport("SFHOAIWEHTAIHWGHEGWEAGHWGAWGWHEWAGHWEAG: %x\n", (u32)2);
 	}
 
 	OSReport("myTestCursor: %x\n", (u32)myTestCursor);
