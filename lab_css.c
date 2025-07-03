@@ -185,12 +185,15 @@ void Test_Think_SelFile(GOBJ *menu_gobj)
 
 	//int down = Pad_GetRapidHeld(*stc_css_hmnport);
 
-	if( HSD_Randi(2) == 1 )
+	//if( HSD_Randi(2) == 1 )
 	//if (down & HSD_BUTTON_DPAD_UP)
 	{
 		myTestCursor = test2Index;
 		OSReport("SFHOAIWEHTAIHWGHEGWEAGHWGAWGWHEWAGHWEAG: %x\n", (u32)2);
 	}
+
+	OSReport("test1index: %x\n", (u32)test1Index);
+	OSReport("test2index: %x\n", (u32)test2Index);
 
 	OSReport("myTestCursor: %x\n", (u32)myTestCursor);
 

@@ -559,8 +559,13 @@ static char *stage_names[] = {
 };
 
 // CSS Import
-s8 *onload_fileno = R13 + (-0x4670);
-s8 *onload_slot = R13 + (-0x466F);
+//s8 *onload_fileno = R13 + (-0x4670);
+//s8 *onload_slot = R13 + (-0x466F);
+u32 *import_states_arr_ptr = R13 + (-0x4670);
+u32 *import_states_arr_len = R13 + (-0x466F);
+
+//s8 *onload_fileno = R13 + (-0x4670);
+//s8 *onload_slot = R13 + (-0x466F);
 #define IMPORT_FILESPERPAGE 10
 typedef enum ImportMenuStates
 {

@@ -25,6 +25,7 @@ static u8 stc_hmn_controller;             // making this static so importing rec
 static u8 stc_cpu_controller;             // making this static so importing recording doesnt overwrite
 static u8 stc_null_controller;            // making this static so importing recording doesnt overwrite
 static LabPersistentData persistent_data;
+static int loadTestInt = 1;
 
 // Aitch: not really a better way to do this that I can think of.
 // Feel free to change if you find a way to implement playback takeover without a global.
@@ -2437,6 +2438,7 @@ int Update_CheckPause()
     // if event menu not showing, develop mode + pause input, toggle frame advance
     if ((Pause_CheckStatus(1) != 2) && (*stc_dblevel >= 3) && (pad->down & HSD_BUTTON_START))
     {
+		OSReport("Pause?\n");
         LabOptions_General[OPTGEN_FRAME].val ^= 1;
         Lab_ChangeFrameAdvance(0, LabOptions_General[OPTGEN_FRAME].val);
         isChange = 1;
@@ -4431,6 +4433,7 @@ void Memcard_Wait()
 }
 void Record_MemcardLoad(int slot, int file_no)
 {
+	OSReport("starting cardLoad: slot: %x\tfile_no: %x\n", (u32)slot, (u32)file_no);
     // search card for this save file
     u8 file_found = 0;
     char filename[32];
@@ -4475,6 +4478,7 @@ void Record_MemcardLoad(int slot, int file_no)
         }
     }
 
+	OSReport("here 1\n");
     // if found, load it
     if (file_found == 1)
     {
@@ -4485,7 +4489,12 @@ void Record_MemcardLoad(int slot, int file_no)
         memcard_save.x4 = 3;
         memcard_save.size = file_size;
         memcard_save.xc = -1;
+
+		OSReport("here %s\n", stc_memcard_info->file_name);
+
         Memcard_ReqSaveLoad(slot, filename, &memcard_save, &stc_memcard_info->file_name, 0, 0, 0);
+
+		OSReport("here 3\n");
 
         // wait to load
         int memcard_status = Memcard_CheckStatus();
@@ -4494,10 +4503,12 @@ void Record_MemcardLoad(int slot, int file_no)
             memcard_status = Memcard_CheckStatus();
         }
 
+		OSReport("here 4\n");
+
         // if file loaded successfully
         if (memcard_status == 0)
         {
-
+			
             // enable other options
             for (int i = 1; i < sizeof(LabOptions_Record) / sizeof(EventOption); i++)
             {
@@ -4514,6 +4525,8 @@ void Record_MemcardLoad(int slot, int file_no)
             RGB565 *img = transfer_buf + header->lookup.ofst_screenshot;
             ExportMenuSettings *menu_settings = transfer_buf + header->lookup.ofst_menusettings;
 
+			OSReport("here 5\n");
+
             // decompress
             RecordingSave *loaded_recsave = calloc(sizeof(RecordingSave) * 1.06);
             lz77Decompress(compressed_recording, loaded_recsave);
@@ -4527,6 +4540,8 @@ void Record_MemcardLoad(int slot, int file_no)
             rec_state->ft_state[0].player_block.controller = stc_hmn_controller;
             rec_state->ft_state[1].player_block.controller = stc_cpu_controller;
 
+			OSReport("here 6\n");
+
             // load state
             Record_LoadSavestate(rec_state);
 
@@ -4537,8 +4552,11 @@ void Record_MemcardLoad(int slot, int file_no)
                 memcpy(rec_data.cpu_inputs[i], &loaded_recsave->cpu_inputs[i], sizeof(RecInputData));
             }
 
+			OSReport("here 7\n");
+
             HSD_Free(loaded_recsave);
 
+			OSReport("here 8\n");
             // copy recording settings
             LabOptions_Record[OPTREC_HMNMODE].val = menu_settings->hmn_mode;
             LabOptions_Record[OPTREC_HMNSLOT].val = menu_settings->hmn_slot;
@@ -4547,22 +4565,29 @@ void Record_MemcardLoad(int slot, int file_no)
             LabOptions_Record[OPTREC_LOOP].val = menu_settings->loop_inputs;
             LabOptions_Record[OPTREC_AUTORESTORE].val = menu_settings->auto_restore;
 
-            // enter recording menu
-            MenuData *menu_data = event_vars->menu_gobj->userdata;
-            EventMenu *curr_menu = menu_data->currMenu;
-            curr_menu->state = EMSTATE_OPENSUB;
-            // update curr_menu
-            EventMenu *next_menu = curr_menu->options[2].menu;
-            next_menu->prev = curr_menu;
-            next_menu->state = EMSTATE_FOCUS;
-            curr_menu = next_menu;
-            menu_data->currMenu = curr_menu;
 
+			//OSReport("here 9\n");
+   //         // enter recording menu
+   //         MenuData *menu_data = event_vars->menu_gobj->userdata;
+   //         EventMenu *curr_menu = menu_data->currMenu;
+   //         curr_menu->state = EMSTATE_OPENSUB;
+   //         // update curr_menu
+
+			//OSReport("here 10\n");
+
+   //         EventMenu *next_menu = curr_menu->options[2].menu;
+   //         next_menu->prev = curr_menu;
+   //         next_menu->state = EMSTATE_FOCUS;
+   //         curr_menu = next_menu;
+   //         menu_data->currMenu = curr_menu;
+
+			OSReport("here 11\n");
             // save to personal savestate
             event_vars->Savestate_Save(event_vars->savestate, 0);
             event_vars->savestate_saved_while_mirrored = event_vars->loaded_mirrored;
         }
 
+		OSReport("here 12\n");
         HSD_Free(memcard_save.data);
     }
 }
@@ -6155,6 +6180,7 @@ void Event_Init(GOBJ *gobj)
     // check to immediately load recording
     if (*onload_fileno != -1)
     {
+		loadTestInt = *onload_fileno;
         Record_MemcardLoad(*onload_slot, *onload_fileno);
         LabOptions_Record[OPTREC_SAVE_LOAD] = Record_Load;
 
@@ -6169,8 +6195,10 @@ void Event_Init(GOBJ *gobj)
 // Update Function
 void Event_Update()
 {
+	//OSReport("update\n");
     GOBJ *hmn = Fighter_GetGObj(0);
     FighterData *hmn_data = hmn->userdata;
+	OSReport("test pad index %x\n", hmn_data->pad_index);
     HSD_Pad *pad = PadGet(hmn_data->pad_index, PADGET_MASTER);
     GOBJ *cpu = Fighter_GetGObj(1);
     FighterData *cpu_data = cpu->userdata;
@@ -6181,6 +6209,41 @@ void Event_Update()
     } else {
         HSD_SetSpeedEasy(1.0);
     }
+
+	
+    int pause_pressed = 0;
+	for (int i = 0; i < 6; i++)
+	{
+		// humans only
+		if (Fighter_GetSlotType(i) == 0)
+		{
+			GOBJ *fighter = Fighter_GetGObj(i);
+			FighterData *fighter_data = fighter->userdata;
+			int controller_index = Fighter_GetControllerPort(i);
+
+			HSD_Pad *pad = PadGet(controller_index, PADGET_MASTER);
+
+			if (pad->down & HSD_BUTTON_DPAD_DOWN)
+			{
+				if (loadTestInt == 1)
+				{
+					Record_MemcardLoad(0, 1);
+					loadTestInt = 2;
+
+				}
+				else
+				{
+					Record_MemcardLoad(0, 2);//HSD_Randi(2));
+					loadTestInt = 1;
+				}
+
+				LabOptions_Record[OPTREC_SAVE_LOAD] = Record_Load;
+
+				// When we load rwing savestates, we don't want infinite shields by default. This would cause desyncs galore.
+				LabOptions_CPU[OPTCPU_SHIELD].val = CPUINFSHIELD_OFF;
+			}
+		}
+	}
 
     // update DI draw
     DIDraw_Update();
@@ -6211,125 +6274,130 @@ void Event_Think_LabState_Normal(GOBJ *event) {
 
     static int move_timer = 0;
     const int MOVE_THRESHOLD = 10;
-    // Move CPU
-    if (lockout_timer > 0)
-    {
-        lockout_timer--;
-    }
-    else
-    {
-        if (pad->held & HSD_BUTTON_DPAD_DOWN)
-        {
-            move_timer++;
-            if (move_timer == MOVE_THRESHOLD)
-            {
-                // handle timer logic
-                move_timer = 0;
-                lockout_timer = LOCKOUT_DURATION;
+    // Move CPU 
 
-                // ensure CPU is not dead
-                if (cpu_data->flags.dead == 0)
-                {
-                    // ensure player is grounded
-                    int isGround = 0;
-                    if (hmn_data->phys.air_state == 0)
-                    {
+	//turned off to use dpad down for testing
+	//if (false)
+	{
+		if (lockout_timer > 0)
+		{
+			lockout_timer--;
+		}
+		else
+		{
+			if (pad->held & HSD_BUTTON_DPAD_DOWN)
+			{
+				move_timer++;
+				if (move_timer == MOVE_THRESHOLD)
+				{
+					// handle timer logic
+					move_timer = 0;
+					lockout_timer = LOCKOUT_DURATION;
 
-                        // check for ground in front of player
-                        Vec3 coll_pos;
-                        int line_index;
-                        int line_kind;
-                        Vec3 line_unk;
-                        float fromX = (hmn_data->phys.pos.X) + (hmn_data->facing_direction * 16);
-                        float toX = fromX;
-                        float fromY = (hmn_data->phys.pos.Y + 5);
-                        float toY = fromY - 10;
-                        isGround = GrColl_RaycastGround(&coll_pos, &line_index, &line_kind, &line_unk, -1, -1, -1, 0, fromX, fromY, toX, toY, 0);
-                        if (isGround == 1)
-                        {
+					// ensure CPU is not dead
+					if (cpu_data->flags.dead == 0)
+					{
+						// ensure player is grounded
+						int isGround = 0;
+						if (hmn_data->phys.air_state == 0)
+						{
 
-                            // do this for every subfighter (thanks for complicated code ice climbers)
-                            int is_moved = 0;
-                            for (int i = 0; i < 2; i++)
-                            {
-                                GOBJ *this_fighter = Fighter_GetSubcharGObj(cpu_data->ply, i);
+							// check for ground in front of player
+							Vec3 coll_pos;
+							int line_index;
+							int line_kind;
+							Vec3 line_unk;
+							float fromX = (hmn_data->phys.pos.X) + (hmn_data->facing_direction * 16);
+							float toX = fromX;
+							float fromY = (hmn_data->phys.pos.Y + 5);
+							float toY = fromY - 10;
+							isGround = GrColl_RaycastGround(&coll_pos, &line_index, &line_kind, &line_unk, -1, -1, -1, 0, fromX, fromY, toX, toY, 0);
+							if (isGround == 1)
+							{
 
-                                if (this_fighter != 0)
-                                {
+								// do this for every subfighter (thanks for complicated code ice climbers)
+								int is_moved = 0;
+								for (int i = 0; i < 2; i++)
+								{
+									GOBJ *this_fighter = Fighter_GetSubcharGObj(cpu_data->ply, i);
 
-                                    FighterData *this_fighter_data = this_fighter->userdata;
+									if (this_fighter != 0)
+									{
 
-                                    if ((this_fighter_data->flags.sleep == 0) && (this_fighter_data->flags.dead == 0))
-                                    {
+										FighterData *this_fighter_data = this_fighter->userdata;
 
-                                        is_moved = 1;
+										if ((this_fighter_data->flags.sleep == 0) && (this_fighter_data->flags.dead == 0))
+										{
 
-                                        // place CPU here
-                                        this_fighter_data->phys.pos = coll_pos;
-                                        this_fighter_data->coll_data.ground_index = line_index;
+											is_moved = 1;
 
-                                        // facing player
-                                        this_fighter_data->facing_direction = hmn_data->facing_direction * -1;
+											// place CPU here
+											this_fighter_data->phys.pos = coll_pos;
+											this_fighter_data->coll_data.ground_index = line_index;
 
-                                        // set grounded
-                                        this_fighter_data->phys.air_state = 0;
-                                        //Fighter_SetGrounded(this_fighter);
+											// facing player
+											this_fighter_data->facing_direction = hmn_data->facing_direction * -1;
 
-                                        // kill velocity
-                                        Fighter_KillAllVelocity(this_fighter);
+											// set grounded
+											this_fighter_data->phys.air_state = 0;
+											//Fighter_SetGrounded(this_fighter);
 
-                                        // enter wait
-                                        Fighter_EnterWait(this_fighter);
+											// kill velocity
+											Fighter_KillAllVelocity(this_fighter);
 
-                                        // update ECB
-                                        this_fighter_data->coll_data.topN_Curr = this_fighter_data->phys.pos; // move current ECB location to new position
-                                        Coll_ECBCurrToPrev(&this_fighter_data->coll_data);
-                                        this_fighter_data->cb.Coll(this_fighter);
+											// enter wait
+											Fighter_EnterWait(this_fighter);
 
-                                        // update camera box
-                                        Fighter_UpdateCameraBox(this_fighter);
-                                        this_fighter_data->camera_subject->boundleft_curr = this_fighter_data->camera_subject->boundleft_proj;
-                                        this_fighter_data->camera_subject->boundright_curr = this_fighter_data->camera_subject->boundright_proj;
+											// update ECB
+											this_fighter_data->coll_data.topN_Curr = this_fighter_data->phys.pos; // move current ECB location to new position
+											Coll_ECBCurrToPrev(&this_fighter_data->coll_data);
+											this_fighter_data->cb.Coll(this_fighter);
 
-                                        // init CPU logic (for nana's popo position history...)
-                                        int cpu_kind = Fighter_GetCPUKind(this_fighter_data->ply);
-                                        int cpu_level = Fighter_GetCPULevel(this_fighter_data->ply);
-                                        Fighter_CPUInitialize(this_fighter_data, cpu_kind, cpu_level, 0);
+											// update camera box
+											Fighter_UpdateCameraBox(this_fighter);
+											this_fighter_data->camera_subject->boundleft_curr = this_fighter_data->camera_subject->boundleft_proj;
+											this_fighter_data->camera_subject->boundright_curr = this_fighter_data->camera_subject->boundright_proj;
 
-                                        // place subfighter in the Z axis
-                                        if (this_fighter_data->flags.ms == 1)
-                                        {
-                                            ftCommonData *ft_common = *stc_ftcommon;
-                                            this_fighter_data->phys.pos.Z = ft_common->ms_zjostle_max * -1;
-                                        }
-                                    }
-                                }
-                            }
+											// init CPU logic (for nana's popo position history...)
+											int cpu_kind = Fighter_GetCPUKind(this_fighter_data->ply);
+											int cpu_level = Fighter_GetCPULevel(this_fighter_data->ply);
+											Fighter_CPUInitialize(this_fighter_data, cpu_kind, cpu_level, 0);
 
-                            if (is_moved == 1)
-                            {
-                                CPUResetVars();
-                            }
-                        }
-                    }
+											// place subfighter in the Z axis
+											if (this_fighter_data->flags.ms == 1)
+											{
+												ftCommonData *ft_common = *stc_ftcommon;
+												this_fighter_data->phys.pos.Z = ft_common->ms_zjostle_max * -1;
+											}
+										}
+									}
+								}
 
-                    // play SFX
-                    if (isGround == 0)
-                    {
-                        SFX_PlayCommon(3);
-                    }
-                    else
-                    {
-                        SFX_Play(221);
-                    }
-                }
-            }
-        }
-        else
-        {
-            move_timer = 0;
-        }
-    }
+								if (is_moved == 1)
+								{
+									CPUResetVars();
+								}
+							}
+						}
+
+						// play SFX
+						if (isGround == 0)
+						{
+							SFX_PlayCommon(3);
+						}
+						else
+						{
+							SFX_Play(221);
+						}
+					}
+				}
+			}
+			else
+			{
+				move_timer = 0;
+			}
+		}
+	}
 
     int hmn_mode = LabOptions_Record[OPTREC_HMNMODE].val;
     int cpu_mode = LabOptions_Record[OPTREC_CPUMODE].val;
@@ -6502,6 +6570,10 @@ void Event_Think(GOBJ *event)
         event_vars->Savestate_Save(event_vars->savestate, Savestate_Silent);
         event_vars->savestate_saved_while_mirrored = event_vars->loaded_mirrored;
     }
+
+
+
+
     
     LabData *eventData = event->userdata;
 
@@ -6514,6 +6586,7 @@ void Event_Think(GOBJ *event)
     FighterData *cpu_data = cpu->userdata;
     HSD_Pad *pad = PadGet(hmn_data->pad_index, PADGET_ENGINE);
     
+
     // We allow negative values to track how long we have not been in lockout for.
     // If the CPU is in hitlag, do not finish the lockout. This prevents insta techs
     // when the tech windows is the 1f between hitlag and knockdown.
