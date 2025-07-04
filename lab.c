@@ -25,7 +25,7 @@ static u8 stc_hmn_controller;             // making this static so importing rec
 static u8 stc_cpu_controller;             // making this static so importing recording doesnt overwrite
 static u8 stc_null_controller;            // making this static so importing recording doesnt overwrite
 static LabPersistentData persistent_data;
-static int loadTestInt = 1;
+static int workIndex = 0;
 
 // Aitch: not really a better way to do this that I can think of.
 // Feel free to change if you find a way to implement playback takeover without a global.
@@ -6177,16 +6177,62 @@ void Event_Init(GOBJ *gobj)
     hmn_data->team = 0;
     cpu_data->team = 1;
 
-    // check to immediately load recording
-    if (*onload_fileno != -1)
-    {
-		loadTestInt = *onload_fileno;
-        Record_MemcardLoad(*onload_slot, *onload_fileno);
-        LabOptions_Record[OPTREC_SAVE_LOAD] = Record_Load;
+	if (*workout_states_arr_len > 0)
+	{
 
-        // When we load rwing savestates, we don't want infinite shields by default. This would cause desyncs galore.
-        LabOptions_CPU[OPTCPU_SHIELD].val = CPUINFSHIELD_OFF;
-    }
+		u8 *test = *workout_states_arr_ptr;
+
+		Record_MemcardLoad(0, test[workIndex]);
+
+		LabOptions_Record[OPTREC_SAVE_LOAD] = Record_Load;
+
+		// When we load rwing savestates, we don't want infinite shields by default. This would cause desyncs galore.
+		LabOptions_CPU[OPTCPU_SHIELD].val = CPUINFSHIELD_OFF;
+
+		++workIndex;
+
+		if (workIndex >= *workout_states_arr_len)
+		{
+			workIndex = 0;
+		}
+	}
+
+
+	/*for (int i = 0; i < *workout_states_arr_len; ++i)
+	{
+		OSReport("when loading lab state value: %x\n", workout_states_arr_ptr[i]);
+	}*/
+
+	//if (*workout_states_arr_len > 0)
+	//{
+	//	u8 *test = *workout_states_arr_ptr;
+
+	//	OSReport("loading: %x\n", test[0]);
+	//	Record_MemcardLoad(0, test[0]);
+
+	//	LabOptions_Record[OPTREC_SAVE_LOAD] = Record_Load;
+
+	//	// When we load rwing savestates, we don't want infinite shields by default. This would cause desyncs galore.
+	//	LabOptions_CPU[OPTCPU_SHIELD].val = CPUINFSHIELD_OFF;
+
+	//	++workIndex;
+
+	//	if (workIndex >= *workout_states_arr_len)
+	//	{
+	//		workIndex = 0;
+	//	}
+	//}
+
+    // check to immediately load recording
+  //  if (*onload_fileno != -1)
+  //  {
+		//loadTestInt = *onload_fileno;
+  //      Record_MemcardLoad(*onload_slot, *onload_fileno);
+  //      LabOptions_Record[OPTREC_SAVE_LOAD] = Record_Load;
+
+  //      // When we load rwing savestates, we don't want infinite shields by default. This would cause desyncs galore.
+  //      LabOptions_CPU[OPTCPU_SHIELD].val = CPUINFSHIELD_OFF;
+  //  }
 
     // Aitch: VERY nice for debugging. Please don't remove.
     OSReport("HMN: %x\tCPU: %x\n", (u32)hmn_data, (u32)cpu_data);
@@ -6198,7 +6244,7 @@ void Event_Update()
 	//OSReport("update\n");
     GOBJ *hmn = Fighter_GetGObj(0);
     FighterData *hmn_data = hmn->userdata;
-	OSReport("test pad index %x\n", hmn_data->pad_index);
+	//OSReport("test pad index %x\n", hmn_data->pad_index);
     HSD_Pad *pad = PadGet(hmn_data->pad_index, PADGET_MASTER);
     GOBJ *cpu = Fighter_GetGObj(1);
     FighterData *cpu_data = cpu->userdata;
@@ -6225,22 +6271,32 @@ void Event_Update()
 
 			if (pad->down & HSD_BUTTON_DPAD_DOWN)
 			{
-				if (loadTestInt == 1)
+				// in develop mode, use X+DPad up
+				if ((Pause_CheckStatus(1) == 2) )
 				{
-					Record_MemcardLoad(0, 1);
-					loadTestInt = 2;
 
 				}
 				else
 				{
-					Record_MemcardLoad(0, 2);//HSD_Randi(2));
-					loadTestInt = 1;
+					u8 *test = *workout_states_arr_ptr;
+
+					Record_MemcardLoad(0, test[workIndex]);
+
+					LabOptions_Record[OPTREC_SAVE_LOAD] = Record_Load;
+
+					// When we load rwing savestates, we don't want infinite shields by default. This would cause desyncs galore.
+					LabOptions_CPU[OPTCPU_SHIELD].val = CPUINFSHIELD_OFF;
+
+					++workIndex;
+
+					if (workIndex >= *workout_states_arr_len)
+					{
+						workIndex = 0;
+					}
 				}
 
-				LabOptions_Record[OPTREC_SAVE_LOAD] = Record_Load;
 
-				// When we load rwing savestates, we don't want infinite shields by default. This would cause desyncs galore.
-				LabOptions_CPU[OPTCPU_SHIELD].val = CPUINFSHIELD_OFF;
+				
 			}
 		}
 	}
@@ -6277,7 +6333,7 @@ void Event_Think_LabState_Normal(GOBJ *event) {
     // Move CPU 
 
 	//turned off to use dpad down for testing
-	//if (false)
+	if (false)
 	{
 		if (lockout_timer > 0)
 		{
