@@ -26,6 +26,7 @@ static u8 stc_cpu_controller;             // making this static so importing rec
 static u8 stc_null_controller;            // making this static so importing recording doesnt overwrite
 static LabPersistentData persistent_data;
 static int workIndex = 0;
+static int currStateFramesRemaining = 0;
 
 // Aitch: not really a better way to do this that I can think of.
 // Feel free to change if you find a way to implement playback takeover without a global.
@@ -55,6 +56,9 @@ const int LOCKOUT_DURATION = 30;
 
 static float cpu_locked_percent = 0;
 static float hmn_locked_percent = 0;
+
+
+
 
 // We need to know if an lcancel was hit for the overlays.
 // There is no flag in the game that stores the lcancel state,
@@ -4582,9 +4586,14 @@ void Record_MemcardLoad(int slot, int file_no)
    //         menu_data->currMenu = curr_menu;
 
 			OSReport("here 11\n");
+
+			
             // save to personal savestate
             event_vars->Savestate_Save(event_vars->savestate, 0);
             event_vars->savestate_saved_while_mirrored = event_vars->loaded_mirrored;
+
+		
+			
         }
 
 		OSReport("here 12\n");
@@ -6009,6 +6018,8 @@ void Event_PostThink(GOBJ *gobj)
 // Init Function
 void Event_Init(GOBJ *gobj)
 {
+	currStateFramesRemaining = 60 * 10;
+
     LabData *eventData = gobj->userdata;
     EventDesc *eventInfo = eventData->eventInfo;
     GOBJ *hmn = Fighter_GetGObj(0);
@@ -6241,6 +6252,23 @@ void Event_Init(GOBJ *gobj)
 // Update Function
 void Event_Update()
 {
+	//stc_match->match.timer = currStateFramesRemaining;
+	
+	//stc_match->match.timer_seconds = 3;// min(255, currStateFramesRemaining);
+	//OSReport("timer test: %x\n", (u32)stc_match->match.timer);
+
+	Match *match = stc_match;
+	match->time_frames = currStateFramesRemaining;
+
+	// update timer
+	int frames = match->time_frames - 1; // this is because the scenethink function runs once before the gobj procs do
+	match->time_seconds = frames / 60;
+	match->time_ms = frames % 60;
+	//u32 *f = 0x804ce380;
+	//*f = 0;
+	/*u16 *f = 0x804978a0 + 0x10;
+
+	*f = 60;*/
 	//OSReport("update\n");
     GOBJ *hmn = Fighter_GetGObj(0);
     FighterData *hmn_data = hmn->userdata;
@@ -6271,6 +6299,9 @@ void Event_Update()
 
 			if (pad->down & HSD_BUTTON_DPAD_DOWN)
 			{
+				//set_eggs_state();
+
+				//if( false  )
 				// in develop mode, use X+DPad up
 				if ((Pause_CheckStatus(1) == 2) )
 				{
@@ -6311,8 +6342,39 @@ void Event_Update()
     // update advanced cam
     Update_Camera();
 
+	if (currStateFramesRemaining == 0)
+	{
+		u8 *test = *workout_states_arr_ptr;
+
+		Record_MemcardLoad(0, test[workIndex]);
+
+		LabOptions_Record[OPTREC_SAVE_LOAD] = Record_Load;
+
+		// When we load rwing savestates, we don't want infinite shields by default. This would cause desyncs galore.
+		LabOptions_CPU[OPTCPU_SHIELD].val = CPUINFSHIELD_OFF;
+
+		++workIndex;
+
+		if (workIndex >= *workout_states_arr_len)
+		{
+			workIndex = 0;
+		}
+
+		currStateFramesRemaining = 60 * 10;
+	}
+	else
+	{
+		currStateFramesRemaining--;
+	}
+
+
     // Check for savestates
     Savestates_Update();
+
+	
+
+
+	
 }
 
 void Event_Think_LabState_Normal(GOBJ *event) {
