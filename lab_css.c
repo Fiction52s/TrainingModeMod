@@ -156,6 +156,7 @@ void Test_Think_SelFile(GOBJ *menu_gobj)
 
 
 	OSReport("workout length: %x\n", workoutLength);
+	OSReport("num files on card: %x\n", import_data.file_num);
 
 	u8 *workout_state_indexes = calloc(workoutLength * sizeof(u8));
 	for (int i = 0; i < workoutLength; ++i)
