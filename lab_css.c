@@ -20,6 +20,12 @@ int CSS_ID(int ext_id);
 int GetSelectedFighterIdOnCssForHmn();
 
 const char *foxWorkout1Files[] = {
+	/*"Fox126",
+	"Fox110",
+	"Fox100",
+	"Fox94",*/
+	//"Fox80",
+	"Fox126",
 	"Fox 40% Upthrow nodi",
 	"Fox: Edge-guard 101"
 };
@@ -159,8 +165,12 @@ void Test_Think_SelFile(GOBJ *menu_gobj)
 	OSReport("num files on card: %x\n", import_data.file_num);
 
 	u8 *workout_state_indexes = calloc(workoutLength * sizeof(u8));
+
+
 	for (int i = 0; i < workoutLength; ++i)
 	{
+		test[i] = 0;
+
 		for (int j = 0; j < import_data.file_num; ++j)
 		{
 			char *file_name = import_data.header[j].metadata.filename; //import_data.file_info[j].file_name

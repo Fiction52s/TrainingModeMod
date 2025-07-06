@@ -57,7 +57,7 @@ const int LOCKOUT_DURATION = 30;
 static float cpu_locked_percent = 0;
 static float hmn_locked_percent = 0;
 
-
+const int DEFAULT_WORK_DURATION = 120;//60 * 60 * 5;
 
 
 // We need to know if an lcancel was hit for the overlays.
@@ -6018,7 +6018,7 @@ void Event_PostThink(GOBJ *gobj)
 // Init Function
 void Event_Init(GOBJ *gobj)
 {
-	currStateFramesRemaining = 60 * 10;
+	currStateFramesRemaining = DEFAULT_WORK_DURATION;//60 * 10;
 
     LabData *eventData = gobj->userdata;
     EventDesc *eventInfo = eventData->eventInfo;
@@ -6252,8 +6252,8 @@ void Event_Init(GOBJ *gobj)
 // Update Function
 void Event_Update()
 {
-	//stc_match->match.timer = currStateFramesRemaining;
 	
+	//stc_match->match.timer = 3;
 	//stc_match->match.timer_seconds = 3;// min(255, currStateFramesRemaining);
 	//OSReport("timer test: %x\n", (u32)stc_match->match.timer);
 
@@ -6264,6 +6264,17 @@ void Event_Update()
 	int frames = match->time_frames - 1; // this is because the scenethink function runs once before the gobj procs do
 	match->time_seconds = frames / 60;
 	match->time_ms = frames % 60;
+
+	//if (match->time_seconds < 6)
+	//{
+	//	//HSD_Randi( 100 );
+	//}
+	//else
+	//{
+	//	stc_match->match.timer = 0;
+	//}
+
+	
 	//u32 *f = 0x804ce380;
 	//*f = 0;
 	/*u16 *f = 0x804978a0 + 0x10;
@@ -6324,6 +6335,8 @@ void Event_Update()
 					{
 						workIndex = 0;
 					}
+
+					currStateFramesRemaining = DEFAULT_WORK_DURATION;
 				}
 
 
@@ -6360,7 +6373,7 @@ void Event_Update()
 			workIndex = 0;
 		}
 
-		currStateFramesRemaining = 60 * 10;
+		currStateFramesRemaining = DEFAULT_WORK_DURATION;
 	}
 	else
 	{
