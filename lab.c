@@ -57,7 +57,7 @@ const int LOCKOUT_DURATION = 30;
 static float cpu_locked_percent = 0;
 static float hmn_locked_percent = 0;
 
-const int DEFAULT_WORK_DURATION = 120;//60 * 60 * 5;
+const int DEFAULT_WORK_DURATION = 60 * 60 * 5;
 
 
 // We need to know if an lcancel was hit for the overlays.

@@ -19,15 +19,17 @@ ExportHeader *GetExportHeaderFromCard(int slot, char *fileName, void *buffer);
 int CSS_ID(int ext_id);
 int GetSelectedFighterIdOnCssForHmn();
 
+//126 > 94 > 90s > 85 > 80 > 75 - 85 > 60 - 75  > 100110 > Edge - Guard
+
 const char *foxWorkout1Files[] = {
-	/*"Fox126",
-	"Fox110",
-	"Fox100",
-	"Fox94",*/
-	//"Fox80",
-	"Fox126",
-	"Fox 40% Upthrow nodi",
-	"Fox: Edge-guard 101"
+	"Fox126(easy)",
+	"Fox94(easy)",
+	"Fox:90%(getupatk)",
+	"Fox90(WDOoS)",
+	"Fox85Backthrow",
+	"Fox75-85",
+	"Fox60-75",
+	"Fox100-110"
 };
 
 int testThinkPhase;
