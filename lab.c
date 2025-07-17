@@ -2,8 +2,6 @@
 
 #include <stddef.h>
 
-#include "cJSON.h"
-
 // Static Variables
 static char nullString[] = " ";
 static DIDraw didraws[6];
@@ -4562,7 +4560,7 @@ void TryLoadSaveData(int slot, int file_no)
 			//OSReport("Recovered JSON:\n%s\n", "f");
 
 
-			cJSON *json = cJSON_Parse(json_data);
+			/*cJSON *json = cJSON_Parse(json_data);
 
 			if (json && cJSON_IsArray(json)) {
 				cJSON *entry = cJSON_GetArrayItem(json, 0);
@@ -4570,7 +4568,7 @@ void TryLoadSaveData(int slot, int file_no)
 					OSReport("Entry: %s\n", entry->valuestring);
 				}
 			}
-			cJSON_Delete(json);
+			cJSON_Delete(json);*/
 
 
 
@@ -7440,7 +7438,3 @@ static bool CheckHasJump(GOBJ *g) {
 
     return jumps_used < max_jumps;
 }
-
-
-
-
