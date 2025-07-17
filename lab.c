@@ -2,6 +2,8 @@
 
 #include <stddef.h>
 
+#include "cJSON.h"
+
 // Static Variables
 static char nullString[] = " ";
 static DIDraw didraws[6];
@@ -4435,6 +4437,296 @@ void Memcard_Wait()
         blr2();
     }
 }
+
+
+void TryLoadSaveData(int slot, int file_no)
+{
+	OSReport("starting cardLoad: slot: %x\tfile_no: %x\n", (u32)slot, (u32)file_no);
+	// search card for this save file
+	u8 file_found = 0;
+	char filename[32];
+	int file_size;
+	s32 memSize, sectorSize;
+	if (CARDProbeEx(slot, &memSize, &sectorSize) == CARD_RESULT_READY)
+	{
+		// mount card
+		stc_memcard_work->is_done = 0;
+		if (CARDMountAsync(slot, stc_memcard_work->work_area, 0, Memcard_RemovedCallback) == CARD_RESULT_READY)
+		{
+			// check card
+			Memcard_Wait();
+			stc_memcard_work->is_done = 0;
+			if (CARDCheckAsync(slot, Memcard_RemovedCallback) == CARD_RESULT_READY)
+			{
+				Memcard_Wait();
+
+				CARDStat card_stat;
+				if (CARDGetStatus(slot, file_no, &card_stat) == CARD_RESULT_READY)
+				{
+					// check company code
+					if (strncmp(os_info->company, card_stat.company, sizeof(os_info->company)) == 0)
+					{
+						// check game name
+						if (strncmp(os_info->gameName, card_stat.gameName, sizeof(os_info->gameName)) == 0)
+						{
+							// check file name
+							if (strncmp("TMREC", card_stat.fileName, 5) == 0)
+							{
+								file_found = 1;
+								memcpy(&filename, card_stat.fileName, sizeof(filename)); // copy filename to load after this
+								file_size = card_stat.length;
+							}
+						}
+					}
+				}
+			}
+
+			CARDUnmount(slot);
+			stc_memcard_work->is_done = 0;
+		}
+	}
+
+	OSReport("here 1\n");
+	// if found, load it
+	if (file_found == 1)
+	{
+
+		// setup load
+		MemcardSave memcard_save;
+		memcard_save.data = HSD_MemAlloc(file_size);
+		memcard_save.x4 = 3;
+		memcard_save.size = file_size;
+		memcard_save.xc = -1;
+
+		OSReport("here %s\n", stc_memcard_info->file_name);
+
+		Memcard_ReqSaveLoad(slot, filename, &memcard_save, &stc_memcard_info->file_name, 0, 0, 0);
+
+		OSReport("here 3\n");
+
+		// wait to load
+		int memcard_status = Memcard_CheckStatus();
+		while (memcard_status == 11)
+		{
+			memcard_status = Memcard_CheckStatus();
+		}
+
+		OSReport("here 4\n");
+
+		// if file loaded successfully
+		if (memcard_status == 0)
+		{
+			//char debug_string[401] = { 0 }; // +1 for null terminator
+			//memcpy(debug_string, ((u8*)memcard_save.data) + 0x1EB0 + 32, 400 - 32); // skip 32-byte block header
+			//OSReport("Custom replay string: %s\n", debug_string);
+
+		/*	char buf[32] = { 0 };
+			memcpy(buf, ((u8*)memcard_save.data) + 0x1380 + 8, 31);
+			OSReport("Custom string: %s\n", buf);*/
+			
+
+
+			//// enable other options
+			//for (int i = 1; i < sizeof(LabOptions_Record) / sizeof(EventOption); i++)
+			//{
+			//	LabOptions_Record[i].disable = 0;
+			//}
+
+			// take screenshot
+			snap_status = 1;
+
+			// begin unpacking
+			u8 *transfer_buf = memcard_save.data;
+			ExportHeader *header = transfer_buf;
+			u8 *compressed_recording = transfer_buf + header->lookup.ofst_recording;
+			//RGB565 *img = transfer_buf + header->lookup.ofst_screenshot;
+			u8 *img = transfer_buf + header->lookup.ofst_screenshot;
+			ExportMenuSettings *menu_settings = transfer_buf + header->lookup.ofst_menusettings;
+
+
+			/*OSReport("First 64 screenshot bytes:\n");
+			for (int i = 0; i < 64; i++) {
+				OSReport("%02X ", ((u8*)img)[i]);
+			}
+			OSReport("\n");*/
+
+			/*char preview[33] = { 0 };
+			memcpy(preview, img + 1, 32);
+			OSReport("Screenshot message: %s\n", preview);*/
+
+			u8* json_data = img + 1;
+			//char json[2 * 96 * 72-1] = { 0 }; // adjust size as needed
+			//memcpy(json, json_data, 2 * 96 * 72 - 1);
+
+			//OSReport("Recovered JSON:\n%s\n", json);
+			//OSReport("Recovered JSON:\n%s\n", "f");
+
+
+			cJSON *json = cJSON_Parse(json_data);
+
+			if (json && cJSON_IsArray(json)) {
+				cJSON *entry = cJSON_GetArrayItem(json, 0);
+				if (cJSON_IsString(entry)) {
+					OSReport("Entry: %s\n", entry->valuestring);
+				}
+			}
+			cJSON_Delete(json);
+
+
+
+			//u8* screenshot_data = (u8*)loaded_recsave + header->lookup.ofst_screenshot;
+
+			//for (int i = 0; i < 64; i++) {
+			//	OSReport("%02X ", img[i]); // should print 11 11 11 ...
+			//}
+
+			/*OSReport("First 64 screenshot bytes:\n");
+			for (int i = 0; i < 64; i++) {
+				OSReport("%02X ", ((u8*)img)[i]);
+			}
+			OSReport("\n");
+
+
+			OSReport("here 5\n");*/
+
+			//u8 *addy = (u8*)header;//((u8*)&(loaded_recsave->hmn_inputs[0])) + 8;
+
+			//for (int i = 0; i < 200; i++) {
+			//	if (i % 10 == 0)
+			//		OSReport("\n");
+			//	OSReport("%02X ", addy[i]);//((u8*)loaded_recsave)[i]);
+			//}
+			//OSReport("\n");
+
+			/*OSReport("---- ExportHeader Metadata ----\n");
+			OSReport("Version: %u\n", header->metadata.version);
+			OSReport("Image Size: %ux%u, Format: %u\n",
+				header->metadata.image_width,
+				header->metadata.image_height,
+				header->metadata.image_fmt);
+			OSReport("HMN: %u (Costume %u), CPU: %u (Costume %u)\n",
+				header->metadata.hmn,
+				header->metadata.hmn_costume,
+				header->metadata.cpu,
+				header->metadata.cpu_costume);
+			OSReport("Stage (ext/int): %u / %u\n",
+				header->metadata.stage_external,
+				header->metadata.stage_internal);
+			OSReport("Date: %02u/%02u/%04u %02u:%02u:%02u\n",
+				header->metadata.month,
+				header->metadata.day,
+				header->metadata.year,
+				header->metadata.hour,
+				header->metadata.minute,
+				header->metadata.second);
+			OSReport("Filename: %s\n", header->metadata.filename);
+
+			OSReport("---- ExportHeader Lookup ----\n");
+			OSReport("Screenshot Offset: 0x%X\n", header->lookup.ofst_screenshot);
+			OSReport("Recording Offset:  0x%X\n", header->lookup.ofst_recording);
+			OSReport("MenuSettings Offset: 0x%X\n", header->lookup.ofst_menusettings);*/
+
+
+			// decompress
+			RecordingSave *loaded_recsave = calloc(sizeof(RecordingSave) * 1.06);
+			lz77Decompress(compressed_recording, loaded_recsave);
+			
+
+			//OSReport("X: %i\n", loaded_recsave->hmn_inputs[0].inputs[0].stickX);
+			
+
+			
+
+
+			/*for (int i = 0; i < 4000; i++) {
+				if (i % 10 == 0)
+					OSReport("\n");
+				OSReport("%02X ", ((u8*)loaded_recsave)[i]);
+			}
+			OSReport("\n");*/
+
+			/*char buf[32] = { 0 };
+			
+			memcpy(buf, addy, 31);
+			
+			OSReport("Custom string from: %s\n", buf); 
+
+			char buf[32] = { 0 };
+			memcpy(buf, ((u8*)loaded_recsave) + 0x1380 + 8, 31);
+			OSReport("Custom string: %s\n", buf);*/
+
+
+			// copy buffer to savestate
+			//memcpy(rec_state, &loaded_recsave->savestate, sizeof(Savestate));
+			//event_vars->savestate_saved_while_mirrored = false;
+			//event_vars->loaded_mirrored = false;
+
+			//// restore controller indices
+			//rec_state->ft_state[0].player_block.controller = stc_hmn_controller;
+			//rec_state->ft_state[1].player_block.controller = stc_cpu_controller;
+
+			//OSReport("here 6\n");
+
+			//// load state
+			//Record_LoadSavestate(rec_state);
+
+			//// copy recordings
+			//for (int i = 0; i < REC_SLOTS; i++)
+			//{
+			//	memcpy(rec_data.hmn_inputs[i], &loaded_recsave->hmn_inputs[i], sizeof(RecInputData));
+			//	memcpy(rec_data.cpu_inputs[i], &loaded_recsave->cpu_inputs[i], sizeof(RecInputData));
+			//}
+
+			//OSReport("here 7\n");
+
+			//HSD_Free(loaded_recsave);
+
+			//OSReport("here 8\n");
+			//// copy recording settings
+			//LabOptions_Record[OPTREC_HMNMODE].val = menu_settings->hmn_mode;
+			//LabOptions_Record[OPTREC_HMNSLOT].val = menu_settings->hmn_slot;
+			//LabOptions_Record[OPTREC_CPUMODE].val = menu_settings->cpu_mode;
+			//LabOptions_Record[OPTREC_CPUSLOT].val = menu_settings->cpu_slot;
+			//LabOptions_Record[OPTREC_LOOP].val = menu_settings->loop_inputs;
+			//LabOptions_Record[OPTREC_AUTORESTORE].val = menu_settings->auto_restore;
+
+
+			////OSReport("here 9\n");
+			////         // enter recording menu
+			////         MenuData *menu_data = event_vars->menu_gobj->userdata;
+			////         EventMenu *curr_menu = menu_data->currMenu;
+			////         curr_menu->state = EMSTATE_OPENSUB;
+			////         // update curr_menu
+
+			////OSReport("here 10\n");
+
+			////         EventMenu *next_menu = curr_menu->options[2].menu;
+			////         next_menu->prev = curr_menu;
+			////         next_menu->state = EMSTATE_FOCUS;
+			////         curr_menu = next_menu;
+			////         menu_data->currMenu = curr_menu;
+
+			//OSReport("here 11\n");
+
+
+			//// save to personal savestate
+			//event_vars->Savestate_Save(event_vars->savestate, 0);
+			//event_vars->savestate_saved_while_mirrored = event_vars->loaded_mirrored;
+
+
+
+		}
+
+		OSReport("here 12\n");
+		HSD_Free(memcard_save.data);
+	}
+}
+
+
+
+
+
+
 void Record_MemcardLoad(int slot, int file_no)
 {
 	OSReport("starting cardLoad: slot: %x\tfile_no: %x\n", (u32)slot, (u32)file_no);
@@ -6018,7 +6310,7 @@ void Event_PostThink(GOBJ *gobj)
 // Init Function
 void Event_Init(GOBJ *gobj)
 {
-	currStateFramesRemaining = DEFAULT_WORK_DURATION;//60 * 10;
+	currStateFramesRemaining = 0;//DEFAULT_WORK_DURATION;//60 * 10;
 
     LabData *eventData = gobj->userdata;
     EventDesc *eventInfo = eventData->eventInfo;
@@ -6193,7 +6485,7 @@ void Event_Init(GOBJ *gobj)
 
 		u8 *test = *workout_states_arr_ptr;
 
-		Record_MemcardLoad(0, test[workIndex]);
+		Record_MemcardLoad(0, test[workIndex + 1]);
 
 		LabOptions_Record[OPTREC_SAVE_LOAD] = Record_Load;
 
@@ -6320,23 +6612,26 @@ void Event_Update()
 				}
 				else
 				{
+
 					u8 *test = *workout_states_arr_ptr;
 
-					Record_MemcardLoad(0, test[workIndex]);
+					TryLoadSaveData(0, test[0]);
 
-					LabOptions_Record[OPTREC_SAVE_LOAD] = Record_Load;
+					//Record_MemcardLoad(0, test[workIndex]);
 
-					// When we load rwing savestates, we don't want infinite shields by default. This would cause desyncs galore.
-					LabOptions_CPU[OPTCPU_SHIELD].val = CPUINFSHIELD_OFF;
+					//LabOptions_Record[OPTREC_SAVE_LOAD] = Record_Load;
 
-					++workIndex;
+					//// When we load rwing savestates, we don't want infinite shields by default. This would cause desyncs galore.
+					//LabOptions_CPU[OPTCPU_SHIELD].val = CPUINFSHIELD_OFF;
 
-					if (workIndex >= *workout_states_arr_len)
-					{
-						workIndex = 0;
-					}
+					//++workIndex;
 
-					currStateFramesRemaining = DEFAULT_WORK_DURATION;
+					//if (workIndex >= *workout_states_arr_len)
+					//{
+					//	workIndex = 0;
+					//}
+
+					//currStateFramesRemaining = 0;//DEFAULT_WORK_DURATION;
 				}
 
 
@@ -6355,7 +6650,7 @@ void Event_Update()
     // update advanced cam
     Update_Camera();
 
-	if (currStateFramesRemaining == 0)
+	if (false)//currStateFramesRemaining == 0)
 	{
 		u8 *test = *workout_states_arr_ptr;
 
@@ -6377,7 +6672,8 @@ void Event_Update()
 	}
 	else
 	{
-		currStateFramesRemaining--;
+		//currStateFramesRemaining--;
+		currStateFramesRemaining++;
 	}
 
 

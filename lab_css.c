@@ -32,6 +32,8 @@ const char *foxWorkout1Files[] = {
 	"Fox100-110"
 };
 
+const char *save_data_name = "workout_save_data";
+
 int testThinkPhase;
 
 void Test_Cam_Think(GOBJ *button_gobj)
@@ -157,8 +159,9 @@ void Test_Think_SelFile(GOBJ *menu_gobj)
 
 	int workoutLength = sizeof(foxWorkout1Files) / sizeof(foxWorkout1Files[0]);
 
-	*workout_states_arr_ptr = calloc(workoutLength * sizeof(u8));
-	*workout_states_arr_len = workoutLength;
+
+	*workout_states_arr_ptr = calloc((workoutLength + 1) * sizeof(u8));
+	*workout_states_arr_len = workoutLength + 1;
 
 	u8 *test = *workout_states_arr_ptr;
 
@@ -169,9 +172,35 @@ void Test_Think_SelFile(GOBJ *menu_gobj)
 	u8 *workout_state_indexes = calloc(workoutLength * sizeof(u8));
 
 
-	for (int i = 0; i < workoutLength; ++i)
+	for (int i = 0; i < workoutLength + 1; ++i)
 	{
 		test[i] = 0;
+	}
+	
+
+	for (int j = 0; j < import_data.file_num; ++j)
+	{
+		char *file_name = import_data.header[j].metadata.filename; //import_data.file_info[j].file_name
+		OSReport("listed: %s\n", file_name);
+	}
+
+
+	for (int j = 0; j < import_data.file_num; ++j)
+	{
+		char *file_name = import_data.header[j].metadata.filename; //import_data.file_info[j].file_name
+		OSReport("checking save file: %s\n", file_name);
+		if (strcmp(save_data_name, file_name) == 0)
+		{
+			OSReport("found save file: %s\n", file_name);
+			OSReport("storing index: %x\n", import_data.file_info[j].file_no);
+			test[0] = import_data.file_info[j].file_no;
+			break;
+		}
+	}
+
+	for (int i = 0; i < workoutLength; ++i)
+	{
+		test[i + 1] = 0;
 
 		for (int j = 0; j < import_data.file_num; ++j)
 		{
@@ -180,15 +209,15 @@ void Test_Think_SelFile(GOBJ *menu_gobj)
 			if (strcmp(foxWorkout1Files[i], file_name) == 0)
 			{
 				OSReport("found: %s\n", file_name);
-				OSReport("storing index: %x\n", import_data.file_info[j].file_no);
-				test[i] = import_data.file_info[j].file_no;
+				OSReport("storing index: %x at location %x\n", import_data.file_info[j].file_no, i + 1);
+				test[i + 1] = import_data.file_info[j].file_no;
 				workout_state_indexes[i] = j;
 				break;
 			}
 		}
 	}
 
-	for (int i = 0; i < workoutLength; ++i)
+	for (int i = 0; i < workoutLength + 1; ++i)
 	{
 		OSReport("state value: %x\n", test[i]);
 	}
@@ -398,6 +427,9 @@ void Read_Recordings()
 						if (CARDGetStatus(slot, i, &card_stat) != CARD_RESULT_READY)
 							continue;
 
+						OSReport("blah 1\n");
+
+						OSReport("company: %s, gamename: %s, filename: %s", card_stat.company, card_stat.gameName, card_stat.fileName);
 						// check file matches expectations
 						if (strncmp(os_info->company, card_stat.company, sizeof(os_info->company)) != 0 ||
 							strncmp(os_info->gameName, card_stat.gameName, sizeof(os_info->gameName)) != 0 ||
@@ -406,6 +438,8 @@ void Read_Recordings()
 
 						//OSReport("File: %\tCPU: %x\n", (u32)hmn_data, (u32)cpu_data); card_stat.fileName);//string(card_stat.fileName) + "\n");//"max characters!\n");
 						//OSReport("%s\n", card_stat.gameName);
+
+						OSReport("blah 2\n");
 
 						if (hmnCSSId != -1)
 						{
@@ -417,6 +451,8 @@ void Read_Recordings()
 								continue;
 							}
 						}
+
+						OSReport("blah 3\n");
 
 						import_data.file_info[import_data.file_num].file_size = card_stat.length;                                      // save file size
 						import_data.file_info[import_data.file_num].file_no = i;                                                       // save file no
