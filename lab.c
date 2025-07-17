@@ -2,6 +2,69 @@
 
 #include <stddef.h>
 
+
+#define MAX_NAME_LEN 32
+#define MAX_EXERCISES 16
+#define MAX_WORKOUTS 64
+
+typedef struct {
+	char name[MAX_NAME_LEN];
+} Exercise;
+
+typedef struct {
+	char name[MAX_NAME_LEN];
+	uint8_t workout_type;
+	uint8_t exercise_count;
+	Exercise exercises[MAX_EXERCISES];
+} Workout;
+
+typedef struct {
+	uint8_t workout_count;
+	Workout workouts[MAX_WORKOUTS];
+} WorkoutFile;
+
+
+int parse_workout_data(uint8_t *data, size_t length, WorkoutFile *out) {
+	size_t offset = 0;
+
+	if (length < 1) return -1;
+
+	out->workout_count = data[offset++];
+	if (out->workout_count > MAX_WORKOUTS) return -2;
+
+	for (int i = 0; i < out->workout_count; i++) {
+		if (offset >= length) return -3;
+
+		uint8_t name_len = data[offset++];
+		if (name_len >= MAX_NAME_LEN || offset + name_len > length) return -4;
+
+		memcpy(out->workouts[i].name, &data[offset], name_len);
+		out->workouts[i].name[name_len] = '\0';
+		offset += name_len;
+
+		if (offset + 2 > length) return -5;
+		out->workouts[i].workout_type = data[offset++];
+		out->workouts[i].exercise_count = data[offset++];
+
+		if (out->workouts[i].exercise_count > MAX_EXERCISES) return -6;
+
+		for (int j = 0; j < out->workouts[i].exercise_count; j++) {
+			if (offset >= length) return -7;
+
+			uint8_t ex_len = data[offset++];
+			if (ex_len >= MAX_NAME_LEN || offset + ex_len > length) return -8;
+
+			memcpy(out->workouts[i].exercises[j].name, &data[offset], ex_len);
+			out->workouts[i].exercises[j].name[ex_len] = '\0';
+			offset += ex_len;
+		}
+	}
+
+	return 0;
+}
+
+
+
 // Static Variables
 static char nullString[] = " ";
 static DIDraw didraws[6];
@@ -4553,6 +4616,21 @@ void TryLoadSaveData(int slot, int file_no)
 			OSReport("Screenshot message: %s\n", preview);*/
 
 			u8* json_data = img + 1;
+
+			WorkoutFile wf;
+			if (parse_workout_data(json_data, 233, &wf) == 0 ) {//2 * 96 * 72 - 1, &wf) == 0) {
+				for (int i = 0; i < wf.workout_count; i++) {
+					OSReport("Workout: %s (type %d)\n", wf.workouts[i].name, wf.workouts[i].workout_type);
+					for (int j = 0; j < wf.workouts[i].exercise_count; j++) {
+						OSReport("  - %s\n", wf.workouts[i].exercises[j].name);
+					}
+				}
+			}
+			else {
+				OSReport("Failed to parse workout data.\n");
+			}
+
+
 			//char json[2 * 96 * 72-1] = { 0 }; // adjust size as needed
 			//memcpy(json, json_data, 2 * 96 * 72 - 1);
 
@@ -4626,8 +4704,8 @@ void TryLoadSaveData(int slot, int file_no)
 
 
 			// decompress
-			RecordingSave *loaded_recsave = calloc(sizeof(RecordingSave) * 1.06);
-			lz77Decompress(compressed_recording, loaded_recsave);
+			//RecordingSave *loaded_recsave = calloc(sizeof(RecordingSave) * 1.06);
+			//lz77Decompress(compressed_recording, loaded_recsave);
 			
 
 			//OSReport("X: %i\n", loaded_recsave->hmn_inputs[0].inputs[0].stickX);
