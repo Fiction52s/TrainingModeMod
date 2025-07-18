@@ -1,6 +1,173 @@
 #include "lab_common.h"
 #include <stddef.h>
 
+#define MAX_NAME_LEN 32
+#define MAX_EXERCISES 16
+#define MAX_WORKOUTS 64
+
+typedef struct {
+	char name[MAX_NAME_LEN];
+} Exercise;
+
+typedef struct {
+	char name[MAX_NAME_LEN];
+	uint8_t workout_type;
+	uint8_t exercise_count;
+	Exercise exercises[MAX_EXERCISES];
+} Workout;
+
+typedef struct {
+	uint8_t workout_count;
+	Workout workouts[MAX_WORKOUTS];
+} WorkoutFile;
+
+
+int parse_workout_data(uint8_t *data, size_t length, WorkoutFile *out) {
+	size_t offset = 0;
+
+	if (length < 1) return -1;
+
+	out->workout_count = data[offset++];
+	if (out->workout_count > MAX_WORKOUTS) return -2;
+
+	for (int i = 0; i < out->workout_count; i++) {
+		if (offset >= length) return -3;
+
+		uint8_t name_len = data[offset++];
+		if (name_len >= MAX_NAME_LEN || offset + name_len > length) return -4;
+
+		memcpy(out->workouts[i].name, &data[offset], name_len);
+		out->workouts[i].name[name_len] = '\0';
+		offset += name_len;
+
+		if (offset + 2 > length) return -5;
+		out->workouts[i].workout_type = data[offset++];
+		out->workouts[i].exercise_count = data[offset++];
+
+		if (out->workouts[i].exercise_count > MAX_EXERCISES) return -6;
+
+		for (int j = 0; j < out->workouts[i].exercise_count; j++) {
+			if (offset >= length) return -7;
+
+			uint8_t ex_len = data[offset++];
+			if (ex_len >= MAX_NAME_LEN || offset + ex_len > length) return -8;
+
+			memcpy(out->workouts[i].exercises[j].name, &data[offset], ex_len);
+			out->workouts[i].exercises[j].name[ex_len] = '\0';
+			offset += ex_len;
+		}
+	}
+
+	return 0;
+}
+
+void LoadWorkoutInfo(int slot, int file_no, WorkoutFile *wf)
+{
+	OSReport("starting cardLoad: slot: %x\tfile_no: %x\n", (u32)slot, (u32)file_no);
+	// search card for this save file
+	u8 file_found = 0;
+	char filename[32];
+	int file_size;
+	s32 memSize, sectorSize;
+	if (CARDProbeEx(slot, &memSize, &sectorSize) == CARD_RESULT_READY)
+	{
+		// mount card
+		stc_memcard_work->is_done = 0;
+		if (CARDMountAsync(slot, stc_memcard_work->work_area, 0, Memcard_RemovedCallback) == CARD_RESULT_READY)
+		{
+			// check card
+			Memcard_Wait();
+			stc_memcard_work->is_done = 0;
+			if (CARDCheckAsync(slot, Memcard_RemovedCallback) == CARD_RESULT_READY)
+			{
+				Memcard_Wait();
+
+				CARDStat card_stat;
+				if (CARDGetStatus(slot, file_no, &card_stat) == CARD_RESULT_READY)
+				{
+					// check company code
+					if (strncmp(os_info->company, card_stat.company, sizeof(os_info->company)) == 0)
+					{
+						// check game name
+						if (strncmp(os_info->gameName, card_stat.gameName, sizeof(os_info->gameName)) == 0)
+						{
+							// check file name
+							if (strncmp("TMREC", card_stat.fileName, 5) == 0)
+							{
+								file_found = 1;
+								memcpy(&filename, card_stat.fileName, sizeof(filename)); // copy filename to load after this
+								file_size = card_stat.length;
+							}
+						}
+					}
+				}
+			}
+
+			CARDUnmount(slot);
+			stc_memcard_work->is_done = 0;
+		}
+	}
+
+	OSReport("here 1\n");
+	// if found, load it
+	if (file_found == 1)
+	{
+		// setup load
+		MemcardSave memcard_save;
+		memcard_save.data = HSD_MemAlloc(file_size);
+		memcard_save.x4 = 3;
+		memcard_save.size = file_size;
+		memcard_save.xc = -1;
+
+		OSReport("here %s\n", stc_memcard_info->file_name);
+
+		Memcard_ReqSaveLoad(slot, filename, &memcard_save, &stc_memcard_info->file_name, 0, 0, 0);
+
+		OSReport("here 3\n");
+
+		// wait to load
+		int memcard_status = Memcard_CheckStatus();
+		while (memcard_status == 11)
+		{
+			memcard_status = Memcard_CheckStatus();
+		}
+
+		OSReport("here 4\n");
+
+		// if file loaded successfully
+		if (memcard_status == 0)
+		{
+			// begin unpacking
+			u8 *transfer_buf = memcard_save.data;
+			ExportHeader *header = transfer_buf;
+			u8 *compressed_recording = transfer_buf + header->lookup.ofst_recording;
+			//RGB565 *img = transfer_buf + header->lookup.ofst_screenshot;
+			u8 *img = transfer_buf + header->lookup.ofst_screenshot;
+			ExportMenuSettings *menu_settings = transfer_buf + header->lookup.ofst_menusettings;
+
+
+			u8* json_data = img + 1;
+
+			//WorkoutFile wf;
+			if (parse_workout_data(json_data, 233, wf) == 0) {//2 * 96 * 72 - 1, &wf) == 0) {
+				for (int i = 0; i < wf->workout_count; i++) {
+					OSReport("Workout: %s (type %d)\n", wf->workouts[i].name, wf->workouts[i].workout_type);
+					for (int j = 0; j < wf->workouts[i].exercise_count; j++) {
+						OSReport("  - %s\n", wf->workouts[i].exercises[j].name);
+					}
+				}
+			}
+			else {
+				OSReport("Failed to parse workout data.\n");
+			}
+		}
+
+		OSReport("here 12\n");
+		HSD_Free(memcard_save.data);
+	}
+}
+
+
 // Static Variables
 static Arch_ImportData *stc_import_assets;
 static ImportData import_data;
@@ -21,16 +188,16 @@ int GetSelectedFighterIdOnCssForHmn();
 
 //126 > 94 > 90s > 85 > 80 > 75 - 85 > 60 - 75  > 100110 > Edge - Guard
 
-const char *foxWorkout1Files[] = {
-	"Fox126(easy)",
-	"Fox94(easy)",
-	"Fox:90%(getupatk)",
-	"Fox90(WDOoS)",
-	"Fox85Backthrow",
-	"Fox75-85",
-	"Fox60-75",
-	"Fox100-110"
-};
+//const char *foxWorkout1Files[] = {
+//	"Fox126(easy)",
+//	"Fox94(easy)",
+//	"Fox:90%(getupatk)",
+//	"Fox90(WDOoS)",
+//	"Fox85Backthrow",
+//	"Fox75-85",
+//	"Fox60-75",
+//	"Fox100-110"
+//};
 
 const char *save_data_name = "workout_save_data";
 
@@ -157,11 +324,30 @@ void Test_Think_SelFile(GOBJ *menu_gobj)
 		return;
 	}
 
-	int workoutLength = sizeof(foxWorkout1Files) / sizeof(foxWorkout1Files[0]);
+	u8 saveDataIndex = 0;
+	for (int j = 0; j < import_data.file_num; ++j)
+	{
+		char *file_name = import_data.header[j].metadata.filename; //import_data.file_info[j].file_name
+		OSReport("checking save file: %s\n", file_name);
+		if (strcmp(save_data_name, file_name) == 0)
+		{
+			OSReport("found save file: %s\n", file_name);
+			OSReport("storing index: %x\n", import_data.file_info[j].file_no);
+			saveDataIndex = import_data.file_info[j].file_no;
+			break;
+		}
+	}
+
+	WorkoutFile wf;
+	LoadWorkoutInfo(0, saveDataIndex, &wf );
 
 
-	*workout_states_arr_ptr = calloc((workoutLength + 1) * sizeof(u8));
-	*workout_states_arr_len = workoutLength + 1;
+	//int workoutLength = sizeof(foxWorkout1Files) / sizeof(foxWorkout1Files[0]);
+	int workoutLength = wf.workouts[0].exercise_count;
+
+
+	*workout_states_arr_ptr = calloc((workoutLength) * sizeof(u8));
+	*workout_states_arr_len = workoutLength;
 
 	u8 *test = *workout_states_arr_ptr;
 
@@ -172,7 +358,7 @@ void Test_Think_SelFile(GOBJ *menu_gobj)
 	u8 *workout_state_indexes = calloc(workoutLength * sizeof(u8));
 
 
-	for (int i = 0; i < workoutLength + 1; ++i)
+	for (int i = 0; i < workoutLength; ++i)
 	{
 		test[i] = 0;
 	}
@@ -184,40 +370,26 @@ void Test_Think_SelFile(GOBJ *menu_gobj)
 		OSReport("listed: %s\n", file_name);
 	}
 
-
-	for (int j = 0; j < import_data.file_num; ++j)
-	{
-		char *file_name = import_data.header[j].metadata.filename; //import_data.file_info[j].file_name
-		OSReport("checking save file: %s\n", file_name);
-		if (strcmp(save_data_name, file_name) == 0)
-		{
-			OSReport("found save file: %s\n", file_name);
-			OSReport("storing index: %x\n", import_data.file_info[j].file_no);
-			test[0] = import_data.file_info[j].file_no;
-			break;
-		}
-	}
-
 	for (int i = 0; i < workoutLength; ++i)
 	{
-		test[i + 1] = 0;
+		test[i] = 0;
 
 		for (int j = 0; j < import_data.file_num; ++j)
 		{
 			char *file_name = import_data.header[j].metadata.filename; //import_data.file_info[j].file_name
 			OSReport("checking: %s\n", file_name);
-			if (strcmp(foxWorkout1Files[i], file_name) == 0)
+			if (strcmp(wf.workouts[0].exercises[i].name, file_name) == 0)
 			{
 				OSReport("found: %s\n", file_name);
 				OSReport("storing index: %x at location %x\n", import_data.file_info[j].file_no, i + 1);
-				test[i + 1] = import_data.file_info[j].file_no;
+				test[i] = import_data.file_info[j].file_no;
 				workout_state_indexes[i] = j;
 				break;
 			}
 		}
 	}
 
-	for (int i = 0; i < workoutLength + 1; ++i)
+	for (int i = 0; i < workoutLength; ++i)
 	{
 		OSReport("state value: %x\n", test[i]);
 	}
