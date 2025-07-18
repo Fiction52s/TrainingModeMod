@@ -564,6 +564,9 @@ u8 *workout_states_arr_len = R13 + (-0x466F);
 //s8 *onload_fileno = R13 + (-0x4670);
 //s8 *onload_slot = R13 + (-0x466F);
 #define IMPORT_FILESPERPAGE 127//10
+
+//this crashes when using the old menu_selfile code, needs to be 10 for that, but 127 for my auto loader
+
 typedef enum ImportMenuStates
 {
     IMP_SELCARD,

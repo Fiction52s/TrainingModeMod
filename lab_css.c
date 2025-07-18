@@ -291,7 +291,7 @@ void Test_Think_SelCard(GOBJ *menu_gobj)
 		import_data.cursor = 0;
 		import_data.page = 0;
 
-		int page_result = Menu_SelFile_LoadPage(menu_gobj, 0);
+		int page_result = new_Menu_SelFile_LoadPage(menu_gobj, 0);
 		if (page_result == -1)
 		{
 			// create dialog
@@ -339,7 +339,7 @@ void Test_Think_SelFile(GOBJ *menu_gobj)
 	}
 
 	WorkoutFile wf;
-	LoadWorkoutInfo(0, saveDataIndex, &wf );
+	LoadWorkoutInfo(0, saveDataIndex, &wf);
 
 
 	//int workoutLength = sizeof(foxWorkout1Files) / sizeof(foxWorkout1Files[0]);
@@ -362,7 +362,7 @@ void Test_Think_SelFile(GOBJ *menu_gobj)
 	{
 		test[i] = 0;
 	}
-	
+
 
 	for (int j = 0; j < import_data.file_num; ++j)
 	{
@@ -1287,7 +1287,7 @@ void Menu_SelFile_Exit(GOBJ *menu_gobj)
 		}
 	}
 }
-int Menu_SelFile_LoadPage(GOBJ *menu_gobj, int page)
+int new_Menu_SelFile_LoadPage(GOBJ *menu_gobj, int page)
 {
 	int result = 0;
 	int cursor = import_data.cursor; // start at cursor
@@ -1390,6 +1390,121 @@ int Menu_SelFile_LoadPage(GOBJ *menu_gobj, int page)
 
 					memcpy(&import_data.header[i], header, sizeof(ExportHeader));
 					//Text_SetText(import_data.filename_text, i, header->metadata.filename);
+				}
+			}
+			// unmount
+			CARDUnmount(slot);
+			stc_memcard_work->is_done = 0;
+		}
+	}
+
+	// free temp read buffer
+	HSD_Free(buffer);
+
+	return result;
+}
+
+
+
+
+int Menu_SelFile_LoadPage(GOBJ *menu_gobj, int page)
+{
+	int result = 0;
+	int cursor = import_data.cursor; // start at cursor
+	int page_total = (import_data.file_num + IMPORT_FILESPERPAGE - 1) / IMPORT_FILESPERPAGE;
+
+	// ensure page exists
+	if (page < 0 || page >= page_total)
+		assert("page index out of bounds");
+
+	// determine files on page
+	int files_on_page = IMPORT_FILESPERPAGE;
+	if (page == page_total - 1)
+		files_on_page = ((import_data.file_num - 1) % IMPORT_FILESPERPAGE) + 1;
+
+	// cancel card read if in progress
+	int memcard_status = Memcard_CheckStatus();
+	if (memcard_status == 11)
+	{
+		// cancel read
+		stc_memcard_work->card_file_info.length = -1;
+
+		// wait for callback to fire
+		while (memcard_status == 11)
+		{
+			memcard_status = Memcard_CheckStatus();
+		}
+	}
+
+	void *buffer = calloc(CARD_READ_SIZE);
+	import_data.snap.loaded_num = 0;
+	import_data.snap.load_inprogress = 0;
+	for (int i = 0; i < IMPORT_FILESPERPAGE; i++)
+	{
+		import_data.snap.is_loaded[i] = 0; // init files as unloaded
+	}
+	result = 1; // set page as toggled
+	int slot = import_data.memcard_slot;
+
+	// update scroll bar position
+	import_data.scroll_top->trans.Y = page * import_data.scroll_bot->trans.Y;
+	JOBJ_SetMtxDirtySub(menu_gobj->hsd_object);
+
+	// free prev buffers
+	for (int i = 0; i < IMPORT_FILESPERPAGE; i++)
+	{
+		// if exists
+		if (import_data.snap.file_data[i] != 0)
+		{
+			HSD_Free(import_data.snap.file_data[i]);
+			import_data.snap.file_data[i] = 0;
+		}
+	}
+
+	// blank out all text
+	for (int i = 0; i < IMPORT_FILESPERPAGE; i++)
+	{
+		Text_SetText(import_data.filename_text, i, "");
+	}
+
+	// mount card
+	s32 memSize, sectorSize;
+	if (CARDProbeEx(slot, &memSize, &sectorSize) == CARD_RESULT_READY)
+	{
+		// mount card
+		stc_memcard_work->is_done = 0;
+		if (CARDMountAsync(slot, stc_memcard_work->work_area, 0, Memcard_RemovedCallback) == CARD_RESULT_READY)
+		{
+			Memcard_Wait();
+
+			// check card
+			stc_memcard_work->is_done = 0;
+			if (CARDCheckAsync(slot, Memcard_RemovedCallback) == CARD_RESULT_READY)
+			{
+				Memcard_Wait();
+
+				// begin loading this page's files
+				for (int i = 0; i < files_on_page; i++)
+				{
+					// get file info
+					int this_file_index = (page * IMPORT_FILESPERPAGE) + i;
+					char *file_name = import_data.file_info[this_file_index].file_name;
+					int file_size = import_data.file_info[this_file_index].file_size;
+					int file_no = import_data.file_info[this_file_index].file_no;
+
+					// get comment from card
+					CARDStat card_stat;
+
+					// get status
+					if (CARDGetStatus(slot, file_no, &card_stat) != CARD_RESULT_READY)
+						continue;
+
+					ExportHeader *header = GetExportHeaderFromCard(slot, file_name, buffer);
+					if (!header)
+						continue;
+
+					memcpy(&import_data.header[i], header, sizeof(ExportHeader));
+					Text_SetText(import_data.filename_text, i, header->metadata.filename);
 				}
 			}
 			// unmount
