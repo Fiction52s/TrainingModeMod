@@ -63,11 +63,12 @@ int parse_workout_data(uint8_t *data, size_t length, WorkoutFile *out) {
 	return 0;
 }
 
-
+static int test_export_phase = 0;
 
 // Static Variables
 static char nullString[] = " ";
 static DIDraw didraws[6];
+static GOBJ *test_gobj;
 static GOBJ *infodisp_gobj_hmn;
 static GOBJ *infodisp_gobj_cpu;
 static RecData rec_data;
@@ -5156,6 +5157,577 @@ void ImageScale(RGB565 *out_img, RGB565 *in_img, int OutWidth, int OutHeight, in
         }
     }
 }
+
+void Test_Me()
+{
+	OSReport("testme start\n");
+	// create gobj
+	// Create menu gobj
+	//GOBJ *gobj = GObj_Create(0, 0, 0);
+	//MenuData *menuData = calloc(sizeof(MenuData));
+	//GObj_AddUserData(gobj, 4, HSD_Free, menuData);
+
+
+	Test_Export_Init(test_gobj);
+
+	GObj_AddProc(test_gobj, Test_Export_Think, 20);
+	
+
+	OSReport("testme end\n");
+}
+
+void Test_Export_Init(GOBJ *menu_gobj)
+{
+	OSReport("test_export_init start\n");
+	MenuData *menu_data = menu_gobj->userdata;
+	EventMenu *curr_menu = menu_data->currMenu;
+	evMenu *menuAssets = event_vars->menu_assets;
+
+	// create gobj
+	GOBJ *export_gobj = GObj_Create(0, 0, 0);
+	ExportData *export_data = calloc(sizeof(ExportData));
+	GObj_AddUserData(export_gobj, 4, HSD_Free, export_data);
+
+	menu_data->custom_gobj_think = Test_Export_Think; //set custom think
+
+	// alloc a buffer for all of the recording data
+	RecordingSave *temp_rec_save = calloc(sizeof(RecordingSave));
+
+	//OSReport("test_export_init a\n");
+
+	// copy match data to buffer
+	memcpy(&temp_rec_save->match_data, &stc_match->match, sizeof(MatchInit));
+	// copy savestate to buffer
+	memcpy(&temp_rec_save->savestate, rec_state, sizeof(Savestate));
+	// copy recordings
+	for (int i = 0; i < REC_SLOTS; i++)
+	{
+		memcpy(&temp_rec_save->hmn_inputs[i], rec_data.hmn_inputs[i], sizeof(RecInputData));
+		memcpy(&temp_rec_save->cpu_inputs[i], rec_data.cpu_inputs[i], sizeof(RecInputData));
+	}
+
+	//OSReport("test_export_init b\n");
+
+	// compress all recording data
+	u8 *recording_buffer = calloc(sizeof(RecordingSave));
+	int compress_size = Export_Compress(recording_buffer, temp_rec_save, sizeof(RecordingSave));
+	HSD_Free(temp_rec_save); // free original data buffer
+
+
+	//OSReport("test_export_init c\n");
+
+							 // resize screenshot
+	int img_size = GXGetTexBufferSize(RESIZE_WIDTH, RESIZE_HEIGHT, 4, 0, 0);
+	//OSReport("test_export_init d\n");
+	//RGB565 *orig_img = snap_image.img_ptr;
+	//OSReport("test_export_init f\n");
+	RGB565 *new_img = calloc(img_size);
+	export_data->scaled_image = new_img;
+	//ImageScale(new_img, orig_img, RESIZE_WIDTH, RESIZE_HEIGHT, EXP_SCREENSHOT_WIDTH, EXP_SCREENSHOT_HEIGHT);
+	//OSReport("test_export_init e\n");
+	//resized_image.img_ptr = new_img;                                            // store pointer to resized image
+	//export_data->screenshot_jobj->dobj->mobj->tobj->imagedesc = &resized_image; // replace pointer to imagedesc
+
+			
+																				
+	//OSReport("test_export_init mid\n");
+																				
+																				// get curr date
+	OSCalendarTime td;
+	OSTicksToCalendarTime(OSGetTime(), &td);
+
+	// alloc a buffer to transfer to memcard
+	stc_transfer_buf_size = sizeof(ExportHeader) + img_size + sizeof(ExportMenuSettings) + compress_size;
+	stc_transfer_buf = calloc(stc_transfer_buf_size);
+
+	// init header
+	ExportHeader *header = stc_transfer_buf;
+	header->metadata.version = REC_VERS;
+	header->metadata.image_width = RESIZE_WIDTH;
+	header->metadata.image_height = RESIZE_HEIGHT;
+	header->metadata.image_fmt = 4;
+	header->metadata.hmn = Fighter_GetExternalID(0);
+	header->metadata.hmn_costume = Fighter_GetCostumeID(0);
+	header->metadata.cpu = Fighter_GetExternalID(1);
+	header->metadata.cpu_costume = Fighter_GetCostumeID(1);
+	header->metadata.stage_external = Stage_GetExternalID();
+	header->metadata.stage_internal = Stage_ExternalToInternal(header->metadata.stage_external);
+	header->metadata.month = td.mon + 1;
+	header->metadata.day = td.mday;
+	header->metadata.year = td.year;
+	header->metadata.hour = td.hour;
+	header->metadata.minute = td.min;
+	header->metadata.second = td.sec;
+	header->lookup.ofst_screenshot = sizeof(ExportHeader);
+	header->lookup.ofst_recording = sizeof(ExportHeader) + img_size;
+	header->lookup.ofst_menusettings = sizeof(ExportHeader) + img_size + compress_size;
+
+	// copy data to buffer
+	// image
+	memcpy(stc_transfer_buf + header->lookup.ofst_screenshot, new_img, img_size);
+	// menu settings
+	ExportMenuSettings *menu_settings = stc_transfer_buf + header->lookup.ofst_menusettings;
+	menu_settings->hmn_mode = LabOptions_Record[OPTREC_HMNMODE].val;
+	menu_settings->hmn_slot = LabOptions_Record[OPTREC_HMNSLOT].val;
+	menu_settings->cpu_mode = LabOptions_Record[OPTREC_CPUMODE].val;
+	menu_settings->cpu_slot = LabOptions_Record[OPTREC_CPUSLOT].val;
+
+	// Recording replay versions are forwards and backwards compatible.
+	// Since we added the Re-Record option, we cannot export it because then it would crash with an invalid
+	// menu setting when importing on a version without the Re-Record setting.
+	if (menu_settings->hmn_mode > RECMODE_HMN_PLAYBACK)
+		menu_settings->hmn_mode = RECMODE_HMN_PLAYBACK;
+	if (menu_settings->cpu_mode > RECMODE_CPU_PLAYBACK)
+		menu_settings->cpu_mode = RECMODE_CPU_PLAYBACK;
+
+	menu_settings->loop_inputs = LabOptions_Record[OPTREC_LOOP].val;
+	menu_settings->auto_restore = LabOptions_Record[OPTREC_AUTORESTORE].val;
+	// recording data
+	memcpy(stc_transfer_buf + header->lookup.ofst_recording, recording_buffer, compress_size); // compressed recording
+
+
+																							   // free compresed data buffer
+	HSD_Free(recording_buffer);
+
+	// alloc filename buffer
+	export_data->filename_buffer = calloc(32 + 2); // +2 for terminator and cursor
+
+												   // initialize memcard menu
+	Test_Export_SelCardInit(export_gobj);
+
+	event_vars->hide_menu = 1;                       // hide original menu
+	menu_data->custom_gobj = export_gobj;            // set custom gobj
+	menu_data->custom_gobj_think = Test_Export_Think;     // set think function
+	menu_data->custom_gobj_destroy = Test_Export_Destroy; // set destroy function
+
+	OSReport("test_export_init end\n");
+}
+
+void Test_Export_Think(GOBJ *export_gobj)
+{
+	OSReport("test_export_think start\n");
+	ExportData *export_data = export_gobj->userdata;
+
+	switch (export_data->menu_index)
+	{
+	case (EXMENU_SELCARD):
+	{
+		Test_Export_SelCardThink(export_gobj);
+		break;
+	}
+	case (EXMENU_NAME):
+	{
+		Test_Export_EnterNameThink(export_gobj);
+		break;
+	}
+	case (EXMENU_CONFIRM):
+	{
+		Test_Export_ConfirmThink(export_gobj);
+		break;
+	}
+	}
+	OSReport("test_export_think end\n");
+}
+
+void Test_Export_SelCardInit(GOBJ *export_gobj)
+{
+	OSReport("Test_Export_SelCardInit start\n");
+	ExportData *export_data = export_gobj->userdata;
+	// init memcard inserted status
+	for (int i = 0; i < 2; i++)
+	{
+		export_data->is_inserted[i] = 0;
+	}
+
+	//init cursor
+	export_data->menu_index = EXMENU_SELCARD;
+	export_data->slot = 0;
+
+	OSReport("Test_Export_SelCardInit end\n");
+}
+
+void Test_Export_SelCardThink(GOBJ *export_gobj)
+{
+	OSReport("Test_Export_SelCardThink start\n");
+	ExportData *export_data = export_gobj->userdata;
+
+	int req_blocks = (divide_roundup(stc_transfer_buf_size, 8192) + 1);
+
+	// update memcard info
+	for (int i = 1; i >= 0; i--)
+	{
+		// probe slot
+		u8 is_inserted;
+
+		s32 memSize, sectorSize;
+		if (CARDProbeEx(i, &memSize, &sectorSize) == CARD_RESULT_READY)
+		{
+			// if it was just inserted, get info
+			if (export_data->is_inserted[i] == 0)
+			{
+
+				// mount card
+				stc_memcard_work->is_done = 0;
+				if (CARDMountAsync(i, stc_memcard_work->work_area, 0, Memcard_RemovedCallback) == CARD_RESULT_READY)
+				{
+					// check card
+					Memcard_Wait();
+					stc_memcard_work->is_done = 0;
+					if (CARDCheckAsync(i, Memcard_RemovedCallback) == CARD_RESULT_READY)
+					{
+						Memcard_Wait();
+
+						// if we get this far, a valid memcard is inserted
+						is_inserted = 1;
+						SFX_PlayCommon(2);
+						//export_data->slot = i;  // move cursor to this
+
+						// get free blocks
+						s32 byteNotUsed, filesNotUsed;
+						if (CARDFreeBlocks(i, &byteNotUsed, &filesNotUsed) == CARD_RESULT_READY)
+						{
+							export_data->free_blocks[i] = (byteNotUsed / 8192);
+							export_data->free_files[i] = filesNotUsed;
+						}
+					}
+					else
+						is_inserted = 0;
+
+					CARDUnmount(i);
+					stc_memcard_work->is_done = 0;
+				}
+				else
+					is_inserted = 0;
+			}
+			else
+				is_inserted = 1;
+		}
+		else
+			is_inserted = 0;
+
+		export_data->is_inserted[i] = is_inserted;
+	}
+
+	int cursor = export_data->slot;
+	// if press A,
+	// ensure it can be saved
+	if ((export_data->is_inserted[cursor] == 1) && (export_data->free_files[cursor] >= 1) && (export_data->free_blocks[cursor] >= req_blocks))
+	{
+		// init next menu
+		Test_Export_EnterNameInit(export_gobj);
+
+		SFX_PlayCommon(1);
+
+		OSReport("Test_Export_SelCardThink end1\n");
+		//if they pressed B this gets called
+		//Export_Destroy(export_gobj);
+
+		return;
+	}
+
+	else
+		SFX_PlayCommon(3);
+
+	OSReport("Test_Export_SelCardThink end2\n");
+}
+
+void Test_Export_EnterNameInit(GOBJ *export_gobj)
+{
+	OSReport("Test_Export_EnterNameInit start\n");
+	ExportData *export_data = export_gobj->userdata;
+	MenuData *menu_data = event_vars->menu_gobj->userdata;
+
+	export_data->key_cursor[0] = 0;
+	export_data->key_cursor[1] = 0;
+	export_data->caps_lock = 0;
+
+	export_data->menu_index = EXMENU_NAME;
+	export_data->filename_cursor = 0;
+
+	OSReport("Test_Export_EnterNameInit end\n");
+}
+
+void Test_Export_EnterNameThink(GOBJ *export_gobj)
+{
+	OSReport("Test_Export_EnterNameThink start\n");
+	ExportData *export_data = export_gobj->userdata;
+
+	char *filename_buffer = export_data->filename_buffer;
+
+
+	strcpy(filename_buffer, "save_export_test");
+
+	// first ensure memcard is still inserted
+	s32 memSize, sectorSize;
+	if (CARDProbeEx(export_data->slot, &memSize, &sectorSize) != CARD_RESULT_READY)
+	{
+		//FAILURE! Abort export!
+	}
+	
+	// at least 1 character
+	//if (export_data->filename_cursor > 0)
+	if( true )
+	{
+		Test_Export_ConfirmInit(export_gobj);
+
+		// play sfx
+		SFX_PlayCommon(1);
+	}
+	else
+	{
+		SFX_PlayCommon(3);
+	}
+
+	OSReport("Test_Export_EnterNameThink end\n");
+
+	return 0;
+}
+
+void Test_Export_ConfirmInit(GOBJ *export_gobj)
+{
+	OSReport("Test_Export_ConfirmInit start\n");
+	ExportData *export_data = export_gobj->userdata;
+
+	export_data->menu_index = EXMENU_CONFIRM;
+	export_data->confirm_state = EXPOP_CONFIRM;
+	export_data->confirm_cursor = 0;
+	OSReport("Test_Export_ConfirmInit end\n");
+}
+
+void Test_Export_ConfirmThink(GOBJ *export_gobj)
+{
+	OSReport("Test_Export_ConfirmThink start\n");
+	ExportData *export_data = export_gobj->userdata;
+
+	// if unplugged exit
+	s32 memSize, sectorSize;
+	if (CARDProbeEx(export_data->slot, &memSize, &sectorSize) != CARD_RESULT_READY)
+	{
+		//FAILURE
+		Export_ConfirmExit(export_gobj);
+		Export_EnterNameExit(export_gobj);
+
+		// play sfx
+		SFX_PlayCommon(0);
+	}
+
+	switch (export_data->confirm_state)
+	{
+	case (EXPOP_CONFIRM):
+	{
+
+		int update_cursor = 0;
+
+		// if a
+		// begin save
+		if (export_data->confirm_cursor == 0)
+		{
+			MenuData *menu_data = event_vars->menu_gobj->userdata;
+
+			export_data->confirm_state = EXPOP_SAVE;
+
+			export_status = EXSTAT_REQSAVE;
+
+			return;
+		}
+		break;
+	}
+	case (EXPOP_SAVE):
+	{
+		// wait for save to finish
+		if (Test_Export_Process(export_gobj) == 1)
+		{
+			OSReport("finished saving\n");
+			export_data->menu_index = EXMENU_NAME;
+
+			Test_Export_Destroy(export_gobj);
+
+			// show menu
+			/*event_vars->hide_menu = 0;
+			menu_data->custom_gobj = 0;
+			menu_data->custom_gobj_think = 0;
+			menu_data->custom_gobj_destroy = 0;*/
+
+			//Export_Destroy(export_gobj);
+
+			// play sfx
+			SFX_PlayCommon(1);
+
+			OSReport("Test_Export_ConfirmThink end\n");
+
+			return 0;
+		}
+		break;
+	}
+	}
+	return 0;
+}
+
+//no changes so far
+int Test_Export_Process(GOBJ *export_gobj)
+{
+	OSReport("Test_Export_Process start\n");
+	ExportData *export_data = export_gobj->userdata;
+	//Text *text = export_data->confirm_text;
+
+	int finished = 0;
+
+	// if snapshot is processing, dont update
+	switch (export_status)
+	{
+	case (EXSTAT_REQSAVE):
+	{
+
+		int slot = export_data->slot;
+
+		save_pre_tick = OSGetTick();
+
+		// create filename string
+		ExportHeader *header = stc_transfer_buf;
+		char filename[32];
+		sprintf(filename, tm_filename, header->metadata.month, header->metadata.day, header->metadata.year, header->metadata.hour, header->metadata.minute, header->metadata.second); // generate filename based on date, time, fighters, and stage
+		
+		OSReport("trying save: %s\n", filename);
+																																													  // save file name to metadata
+		//memcpy(&header->metadata.filename, export_data->filename_buffer, export_data->filename_cursor);
+		strcpy(header->metadata.filename, "pleasework");
+
+		// check if file exists and delete it
+		s32 memSize, sectorSize;
+		if (CARDProbeEx(slot, &memSize, &sectorSize) == CARD_RESULT_READY)
+		{
+			// mount card
+			stc_memcard_work->is_done = 0;
+			if (CARDMountAsync(slot, stc_memcard_work->work_area, 0, Memcard_RemovedCallback) == CARD_RESULT_READY)
+			{
+				// check card
+				Memcard_Wait();
+				stc_memcard_work->is_done = 0;
+				if (CARDCheckAsync(slot, Memcard_RemovedCallback) == CARD_RESULT_READY)
+				{
+					Memcard_Wait();
+					// get free blocks
+					s32 byteNotUsed, filesNotUsed;
+					if (CARDFreeBlocks(slot, &byteNotUsed, &filesNotUsed) == CARD_RESULT_READY)
+					{
+						// search for file with this name
+						for (int i = 0; i < CARD_MAX_FILE; i++)
+						{
+							CARDStat card_stat;
+
+							if (CARDGetStatus(slot, i, &card_stat) == CARD_RESULT_READY)
+							{
+								// check company code
+								if (strncmp(os_info->company, card_stat.company, sizeof(os_info->company)) == 0)
+								{
+									// check game name
+									if (strncmp(os_info->gameName, card_stat.gameName, sizeof(os_info->gameName)) == 0)
+									{
+										// check file name
+										if (strncmp(&filename, card_stat.fileName, sizeof(filename)) == 0)
+										{
+											// delete
+											CARDDeleteAsync(slot, &filename, Memcard_RemovedCallback);
+											stc_memcard_work->is_done = 0;
+											Memcard_Wait();
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+				CARDUnmount(slot);
+				stc_memcard_work->is_done = 0;
+			}
+		}
+
+		// setup save
+		memcpy(stc_memcard_info->file_name, &stc_save_name, sizeof(stc_save_name));
+		memset(stc_memcard_info->file_desc, '\0', 32);                                                   // fill with spaces
+		memcpy(stc_memcard_info->file_desc, export_data->filename_buffer, export_data->filename_cursor); // copy inputted name
+		memcard_save.data = stc_transfer_buf;
+		memcard_save.x4 = 3;
+		memcard_save.size = stc_transfer_buf_size;
+		memcard_save.xc = -1;
+		Memcard_ReqSaveCreate(slot, &filename, &memcard_save, stc_memcard_unk, stc_memcard_info->file_name, stc_lab_data->save_banner, stc_lab_data->save_icon, 0);
+
+		// change status
+		export_status = EXSTAT_SAVEWAIT;
+
+		break;
+	}
+	case (EXSTAT_SAVEWAIT):
+	{
+
+		// wait to finish writing
+		if (Memcard_CheckStatus() != 11)
+		{
+			// change state
+			export_status = EXSTAT_DONE;
+		}
+		else
+		{
+			/*if (*stc_memcard_write_status == 6)
+			{
+				Text_SetText(text, 0, "Writing Data...");
+			}
+			else
+			{
+				Text_SetText(text, 0, "Creating File");
+			}*/
+		}
+
+		break;
+	}
+	case (EXSTAT_DONE):
+	{
+
+		export_status = EXSTAT_NONE;
+		finished = 1;
+
+		//Text_Destroy(text);
+
+		// done saving, output time
+		int save_post_tick = OSGetTick();
+		int save_time = OSTicksToMilliseconds(save_post_tick - save_pre_tick);
+		break;
+	}
+	}
+
+	if( finished )
+	{
+		OSReport("Test_Export_Process finished\n");
+	}
+
+	return finished;
+}
+
+void Test_Export_Destroy(GOBJ *export_gobj)
+{
+	OSReport("Test_Export_Destroy start\n");
+	ExportData *export_data = export_gobj->userdata;
+	MenuData *menu_data = event_vars->menu_gobj->userdata;
+
+	// free buffer allocs
+	HSD_Free(stc_transfer_buf);
+	HSD_Free(export_data->filename_buffer);
+	//HSD_Free(export_data->scaled_image);
+
+	OSReport("Test_Export_Destroy mid\n");
+
+	// destroy gobj
+	GObj_Destroy(export_gobj);
+
+	// show menu
+	event_vars->hide_menu = 0;
+	menu_data->custom_gobj = 0;
+	menu_data->custom_gobj_think = 0;
+	menu_data->custom_gobj_destroy = 0;
+	OSReport("Test_Export_Destroy end\n");
+}
+//no need to make custom Export_Compress
+
 void Export_Init(GOBJ *menu_gobj)
 {
     MenuData *menu_data = menu_gobj->userdata;
@@ -6395,6 +6967,10 @@ void Event_Init(GOBJ *gobj)
     GOBJ *cpu = Fighter_GetGObj(1);
     FighterData *cpu_data = cpu->userdata;
     GObj_AddProc(gobj, Event_PostThink, 20);
+
+	
+	
+
     // Init runtime options...
     
     // advanced counter options
@@ -6530,6 +7106,11 @@ void Event_Init(GOBJ *gobj)
     InfoDisplay_Update(infodisp_gobj_hmn, LabOptions_InfoDisplayHMN, Fighter_GetGObj(0), NULL);
     InfoDisplay_Update(infodisp_gobj_cpu, LabOptions_InfoDisplayCPU, Fighter_GetGObj(1), infodisp_gobj_hmn);
 
+	test_gobj = GObj_Create(0, 0, 0);
+	MenuData *md = calloc(sizeof(MenuData));
+	GObj_AddUserData(test_gobj, 4, HSD_Free, md);
+	
+
     // Init DIDraw
     DIDraw_Init();
 
@@ -6561,7 +7142,7 @@ void Event_Init(GOBJ *gobj)
 
 		u8 *test = *workout_states_arr_ptr;
 
-		Record_MemcardLoad(0, test[workIndex + 1]);
+		Record_MemcardLoad(0, test[workIndex]);
 
 		LabOptions_Record[OPTREC_SAVE_LOAD] = Record_Load;
 
@@ -6575,43 +7156,6 @@ void Event_Init(GOBJ *gobj)
 			workIndex = 0;
 		}
 	}
-
-
-	/*for (int i = 0; i < *workout_states_arr_len; ++i)
-	{
-		OSReport("when loading lab state value: %x\n", workout_states_arr_ptr[i]);
-	}*/
-
-	//if (*workout_states_arr_len > 0)
-	//{
-	//	u8 *test = *workout_states_arr_ptr;
-
-	//	OSReport("loading: %x\n", test[0]);
-	//	Record_MemcardLoad(0, test[0]);
-
-	//	LabOptions_Record[OPTREC_SAVE_LOAD] = Record_Load;
-
-	//	// When we load rwing savestates, we don't want infinite shields by default. This would cause desyncs galore.
-	//	LabOptions_CPU[OPTCPU_SHIELD].val = CPUINFSHIELD_OFF;
-
-	//	++workIndex;
-
-	//	if (workIndex >= *workout_states_arr_len)
-	//	{
-	//		workIndex = 0;
-	//	}
-	//}
-
-    // check to immediately load recording
-  //  if (*onload_fileno != -1)
-  //  {
-		//loadTestInt = *onload_fileno;
-  //      Record_MemcardLoad(*onload_slot, *onload_fileno);
-  //      LabOptions_Record[OPTREC_SAVE_LOAD] = Record_Load;
-
-  //      // When we load rwing savestates, we don't want infinite shields by default. This would cause desyncs galore.
-  //      LabOptions_CPU[OPTCPU_SHIELD].val = CPUINFSHIELD_OFF;
-  //  }
 
     // Aitch: VERY nice for debugging. Please don't remove.
     OSReport("HMN: %x\tCPU: %x\n", (u32)hmn_data, (u32)cpu_data);
@@ -6676,7 +7220,7 @@ void Event_Update()
 
 			HSD_Pad *pad = PadGet(controller_index, PADGET_MASTER);
 
-			if (pad->down & HSD_BUTTON_DPAD_DOWN)
+			if (pad->down & HSD_BUTTON_DPAD_DOWN && pad->held & HSD_TRIGGER_L)
 			{
 				//set_eggs_state();
 
@@ -6688,10 +7232,8 @@ void Event_Update()
 				}
 				else
 				{
-
-					u8 *test = *workout_states_arr_ptr;
-
-					TryLoadSaveData(0, test[0]);
+					Test_Me();
+					//u8 *test = *workout_states_arr_ptr;
 
 					//Record_MemcardLoad(0, test[workIndex]);
 
@@ -6713,6 +7255,7 @@ void Event_Update()
 
 				
 			}
+			//else if( pad->)
 		}
 	}
 

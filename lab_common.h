@@ -485,10 +485,21 @@ JOBJ *Record_IDToBone(FighterData *fighter_data, int id);
 void Snap_CObjThink(GOBJ *gobj);
 void Record_StartExport(GOBJ *menu_gobj);
 void Export_Init(GOBJ *menu_gobj);
+void Test_Export_Init(GOBJ *menu_gobj);
+
+
 int Export_Think(GOBJ *export_gobj);
+void Test_Export_Think(GOBJ *export_gobj);
+
 void Export_Destroy(GOBJ *export_gobj);
+void Test_Export_Destroy(GOBJ *export_gobj);
+
 void Export_SelCardInit(GOBJ *export_gobj);
+void Test_Export_SelCardInit(GOBJ *export_gobj);
+
 int Export_SelCardThink(GOBJ *export_gobj);
+void Test_Export_SelCardThink(GOBJ *export_gobj);
+
 int Export_Compress(u8 *dest, u8 *source, u32 size);
 void Lab_Exit(int value);
 void InfoDisplay_Update(GOBJ *menu_gobj, EventOption menu[], GOBJ *fighter, GOBJ *below);

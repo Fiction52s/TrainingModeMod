@@ -149,7 +149,8 @@ void LoadWorkoutInfo(int slot, int file_no, WorkoutFile *wf)
 			u8* json_data = img + 1;
 
 			//WorkoutFile wf;
-			if (parse_workout_data(json_data, 233, wf) == 0) {//2 * 96 * 72 - 1, &wf) == 0) {
+			//233
+			if (parse_workout_data(json_data, 2 * 96 * 72 - 1, wf) == 0) {//2 * 96 * 72 - 1, &wf) == 0) {
 				for (int i = 0; i < wf->workout_count; i++) {
 					OSReport("Workout: %s (type %d)\n", wf->workouts[i].name, wf->workouts[i].workout_type);
 					for (int j = 0; j < wf->workouts[i].exercise_count; j++) {

@@ -2794,7 +2794,7 @@ static EventOption LabOptions_Record[OPTREC_COUNT] = {
         .kind = OPTKIND_FUNC,
         .name = "Export",
         .desc = "Export the recording to a memory card\nfor later use or to share with others.",
-        .OnSelect = Export_Init,
+        .OnSelect = Test_Export_Init,
     },
 };
 
