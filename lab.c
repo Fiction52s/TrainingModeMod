@@ -3,27 +3,6 @@
 #include <stddef.h>
 
 
-#define MAX_NAME_LEN 32
-#define MAX_EXERCISES 16
-#define MAX_WORKOUTS 64
-
-typedef struct {
-	char name[MAX_NAME_LEN];
-} Exercise;
-
-typedef struct {
-	char name[MAX_NAME_LEN];
-	uint8_t workout_type;
-	uint8_t exercise_count;
-	Exercise exercises[MAX_EXERCISES];
-} Workout;
-
-typedef struct {
-	uint8_t workout_count;
-	Workout workouts[MAX_WORKOUTS];
-} WorkoutFile;
-
-
 int parse_workout_data(uint8_t *data, size_t length, WorkoutFile *out) {
 	size_t offset = 0;
 
@@ -64,6 +43,26 @@ int parse_workout_data(uint8_t *data, size_t length, WorkoutFile *out) {
 }
 
 static int test_export_phase = 0;
+
+typedef struct {
+	char exercise_name[MAX_NAME_LEN];
+	uint32_t frames_to_complete;
+	uint32_t attempt_count;
+	uint32_t success_count;
+	uint8_t workout_type;
+	uint8_t padding[3];
+
+} ExportExerciseData;
+
+
+typedef struct {
+	char workout_name[MAX_NAME_LEN];
+	uint8_t exercise_count;
+	uint8_t padding[3];
+	ExportExerciseData excercise_data[MAX_EXERCISES];
+
+} ExportWorkoutData;
+
 
 // Static Variables
 static char nullString[] = " ";
@@ -5223,6 +5222,48 @@ void Test_Export_Init(GOBJ *menu_gobj)
 	//OSReport("test_export_init f\n");
 	RGB565 *new_img = calloc(img_size);
 	export_data->scaled_image = new_img;
+
+	// Cast image buffer to a byte-wise pointer
+	uint8_t *byte_ptr = (uint8_t *)new_img;
+	byte_ptr += 1; //single offset for whatever reason
+
+	//PUT MY CUSTOM DATA INTO THE BUFFER HERE
+
+	ExportWorkoutData export_workout_data = { 0 };
+
+	// Example: fill it with dummy data
+	strncpy(export_workout_data.workout_name, "test_workout", MAX_NAME_LEN);
+	export_workout_data.exercise_count = 2;
+
+	strncpy(export_workout_data.excercise_data[0].exercise_name, "exercise_1", MAX_NAME_LEN);
+	export_workout_data.excercise_data[0].frames_to_complete = 120;
+	export_workout_data.excercise_data[0].attempt_count = 10;
+	export_workout_data.excercise_data[0].success_count = 4;
+	export_workout_data.excercise_data[0].workout_type = 1;
+
+	strncpy(export_workout_data.excercise_data[1].exercise_name, "exercise_2", MAX_NAME_LEN);
+	export_workout_data.excercise_data[1].frames_to_complete = 85;
+	export_workout_data.excercise_data[1].attempt_count = 7;
+	export_workout_data.excercise_data[1].success_count = 7;
+	export_workout_data.excercise_data[1].workout_type = 2;
+
+	// Determine how many bytes we need to write
+	size_t struct_size = sizeof(ExportWorkoutData);
+
+	// Ensure we’re not going out of bounds in the image
+	if (1 + struct_size <= img_size) {
+		memcpy(byte_ptr, &export_workout_data, struct_size);
+	}
+	else {
+		OSReport("Error: Not enough room in image buffer to write workout data.\n");
+	}
+
+	//const char *message = "HERE I AM TESTING";
+	//size_t message_len = strlen(message);
+
+	//// Write the message starting at offset 1 from new_img
+	//memcpy(byte_ptr, message, message_len);
+
 	//ImageScale(new_img, orig_img, RESIZE_WIDTH, RESIZE_HEIGHT, EXP_SCREENSHOT_WIDTH, EXP_SCREENSHOT_HEIGHT);
 	//OSReport("test_export_init e\n");
 	//resized_image.img_ptr = new_img;                                            // store pointer to resized image
@@ -5452,10 +5493,14 @@ void Test_Export_EnterNameThink(GOBJ *export_gobj)
 	OSReport("Test_Export_EnterNameThink start\n");
 	ExportData *export_data = export_gobj->userdata;
 
-	char *filename_buffer = export_data->filename_buffer;
+	//for some reason this isn't working
+	//char *filename_buffer = export_data->filename_buffer;
 
 
-	strcpy(filename_buffer, "save_export_test");
+	//strcpy(filename_buffer, "save_export_test");
+
+
+	OSReport("Test_Export_EnterNameThink a\n");
 
 	// first ensure memcard is still inserted
 	s32 memSize, sectorSize;
@@ -5464,12 +5509,16 @@ void Test_Export_EnterNameThink(GOBJ *export_gobj)
 		//FAILURE! Abort export!
 	}
 	
+
+	OSReport("Test_Export_EnterNameThink b\n");
 	// at least 1 character
 	//if (export_data->filename_cursor > 0)
 	if( true )
 	{
 		Test_Export_ConfirmInit(export_gobj);
 
+
+		OSReport("Test_Export_EnterNameThink c\n");
 		// play sfx
 		SFX_PlayCommon(1);
 	}
@@ -5585,8 +5634,9 @@ int Test_Export_Process(GOBJ *export_gobj)
 		// create filename string
 		ExportHeader *header = stc_transfer_buf;
 		char filename[32];
-		sprintf(filename, tm_filename, header->metadata.month, header->metadata.day, header->metadata.year, header->metadata.hour, header->metadata.minute, header->metadata.second); // generate filename based on date, time, fighters, and stage
+		//sprintf(filename, tm_filename, header->metadata.month, header->metadata.day, header->metadata.year, header->metadata.hour, header->metadata.minute, header->metadata.second); // generate filename based on date, time, fighters, and stage
 		
+		strcpy(filename, "pleasework");
 		OSReport("trying save: %s\n", filename);
 																																													  // save file name to metadata
 		//memcpy(&header->metadata.filename, export_data->filename_buffer, export_data->filename_cursor);
@@ -5711,7 +5761,8 @@ void Test_Export_Destroy(GOBJ *export_gobj)
 
 	// free buffer allocs
 	HSD_Free(stc_transfer_buf);
-	HSD_Free(export_data->filename_buffer);
+	//not able to free buffer, because apparently it was null earlier and culdn't be used...
+	//HSD_Free(export_data->filename_buffer);
 	//HSD_Free(export_data->scaled_image);
 
 	OSReport("Test_Export_Destroy mid\n");
@@ -7137,12 +7188,16 @@ void Event_Init(GOBJ *gobj)
     hmn_data->team = 0;
     cpu_data->team = 1;
 
-	if (*workout_states_arr_len > 0)
+	LoadedWorkoutInfo *loaded_workout = *workout_info;
+
+	if (loaded_workout->workout.exercise_count > 0)
 	{
+		//u8 *test = *workout_info->exercise_indexes;
 
-		u8 *test = *workout_states_arr_ptr;
+		OSReport("SUCCESS %i\n", loaded_workout->workout.exercise_count);
 
-		Record_MemcardLoad(0, test[workIndex]);
+
+		Record_MemcardLoad(0, loaded_workout->exercise_indexes[workIndex]);
 
 		LabOptions_Record[OPTREC_SAVE_LOAD] = Record_Load;
 
@@ -7151,10 +7206,14 @@ void Event_Init(GOBJ *gobj)
 
 		++workIndex;
 
-		if (workIndex >= *workout_states_arr_len)
+		if (workIndex >= loaded_workout->workout.exercise_count)
 		{
 			workIndex = 0;
 		}
+	}
+	else
+	{
+		OSReport("FAILFAILFAIL\n");
 	}
 
     // Aitch: VERY nice for debugging. Please don't remove.
@@ -7271,23 +7330,23 @@ void Event_Update()
 
 	if (false)//currStateFramesRemaining == 0)
 	{
-		u8 *test = *workout_states_arr_ptr;
+		//u8 *test = *workout_states_arr_ptr;
 
-		Record_MemcardLoad(0, test[workIndex]);
+		//Record_MemcardLoad(0, test[workIndex]);
 
-		LabOptions_Record[OPTREC_SAVE_LOAD] = Record_Load;
+		//LabOptions_Record[OPTREC_SAVE_LOAD] = Record_Load;
 
-		// When we load rwing savestates, we don't want infinite shields by default. This would cause desyncs galore.
-		LabOptions_CPU[OPTCPU_SHIELD].val = CPUINFSHIELD_OFF;
+		//// When we load rwing savestates, we don't want infinite shields by default. This would cause desyncs galore.
+		//LabOptions_CPU[OPTCPU_SHIELD].val = CPUINFSHIELD_OFF;
 
-		++workIndex;
+		//++workIndex;
 
-		if (workIndex >= *workout_states_arr_len)
-		{
-			workIndex = 0;
-		}
+		//if (workIndex >= *workout_states_arr_len)
+		//{
+		//	workIndex = 0;
+		//}
 
-		currStateFramesRemaining = DEFAULT_WORK_DURATION;
+		//currStateFramesRemaining = DEFAULT_WORK_DURATION;
 	}
 	else
 	{

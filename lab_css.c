@@ -1,26 +1,6 @@
 #include "lab_common.h"
 #include <stddef.h>
 
-#define MAX_NAME_LEN 32
-#define MAX_EXERCISES 16
-#define MAX_WORKOUTS 64
-
-typedef struct {
-	char name[MAX_NAME_LEN];
-} Exercise;
-
-typedef struct {
-	char name[MAX_NAME_LEN];
-	uint8_t workout_type;
-	uint8_t exercise_count;
-	Exercise exercises[MAX_EXERCISES];
-} Workout;
-
-typedef struct {
-	uint8_t workout_count;
-	Workout workouts[MAX_WORKOUTS];
-} WorkoutFile;
-
 
 int parse_workout_data(uint8_t *data, size_t length, WorkoutFile *out) {
 	size_t offset = 0;
@@ -346,11 +326,17 @@ void Test_Think_SelFile(GOBJ *menu_gobj)
 	//int workoutLength = sizeof(foxWorkout1Files) / sizeof(foxWorkout1Files[0]);
 	int workoutLength = wf.workouts[0].exercise_count;
 
+	LoadedWorkoutInfo *loaded_workout_info = calloc(sizeof(LoadedWorkoutInfo));
 
-	*workout_states_arr_ptr = calloc((workoutLength) * sizeof(u8));
-	*workout_states_arr_len = workoutLength;
 
-	u8 *test = *workout_states_arr_ptr;
+	*workout_info = loaded_workout_info;//calloc((workoutLength) * sizeof(u8));
+	//*workout_states_arr_len = workoutLength;
+
+	memcpy(&(loaded_workout_info->workout), &(wf.workouts[0]), sizeof(Workout));
+
+	workoutLength = loaded_workout_info->workout.exercise_count;
+
+	//u8 *test = *workout_states_arr_ptr;
 
 
 	OSReport("workout length: %x\n", workoutLength);
@@ -361,7 +347,7 @@ void Test_Think_SelFile(GOBJ *menu_gobj)
 
 	for (int i = 0; i < workoutLength; ++i)
 	{
-		test[i] = 0;
+		loaded_workout_info->exercise_indexes[i] = 0;
 	}
 
 
@@ -373,7 +359,7 @@ void Test_Think_SelFile(GOBJ *menu_gobj)
 
 	for (int i = 0; i < workoutLength; ++i)
 	{
-		test[i] = 0;
+		//loaded_workout_info->exercise_indexes[i] = 0;
 
 		for (int j = 0; j < import_data.file_num; ++j)
 		{
@@ -383,7 +369,7 @@ void Test_Think_SelFile(GOBJ *menu_gobj)
 			{
 				OSReport("found: %s\n", file_name);
 				OSReport("storing index: %x at location %x\n", import_data.file_info[j].file_no, i + 1);
-				test[i] = import_data.file_info[j].file_no;
+				loaded_workout_info->exercise_indexes[i] = import_data.file_info[j].file_no;
 				workout_state_indexes[i] = j;
 				break;
 			}
@@ -392,7 +378,7 @@ void Test_Think_SelFile(GOBJ *menu_gobj)
 
 	for (int i = 0; i < workoutLength; ++i)
 	{
-		OSReport("state value: %x\n", test[i]);
+		OSReport("state value: %x\n", loaded_workout_info->exercise_indexes[i]);
 	}
 
 	int myTestCursor = workout_state_indexes[0];

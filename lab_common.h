@@ -569,12 +569,44 @@ static char *stage_names[] = {
     "Final Destination",
 };
 
+#define MAX_NAME_LEN 32
+#define MAX_EXERCISES 16
+#define MAX_WORKOUTS 64
+
+
+
+typedef struct {
+	char name[MAX_NAME_LEN];
+} Exercise;
+
+typedef struct {
+	char name[MAX_NAME_LEN];
+	uint8_t workout_type;
+	uint8_t exercise_count;
+	Exercise exercises[MAX_EXERCISES];
+} Workout;
+
+typedef struct {
+	uint8_t workout_count;
+	Workout workouts[MAX_WORKOUTS];
+} WorkoutFile;
+
+typedef struct
+{
+	Workout workout;
+	uint8_t exercise_indexes[MAX_EXERCISES];
+} LoadedWorkoutInfo;
+
+
+
 // CSS Import
-u8 **workout_states_arr_ptr = R13 + (-0x4670);
+LoadedWorkoutInfo **workout_info = R13 + (-0x4670);
 u8 *workout_states_arr_len = R13 + (-0x466F);
 //s8 *onload_fileno = R13 + (-0x4670);
 //s8 *onload_slot = R13 + (-0x466F);
 #define IMPORT_FILESPERPAGE 127//10
+
+
 
 //this crashes when using the old menu_selfile code, needs to be 10 for that, but 127 for my auto loader
 
