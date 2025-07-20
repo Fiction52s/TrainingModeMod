@@ -47,9 +47,9 @@ static int test_export_phase = 0;
 typedef struct {
 	char exercise_name[MAX_NAME_LEN];
 	uint32_t frames_to_complete;
-	uint32_t attempt_count;
 	uint32_t success_count;
-	uint8_t workout_type;
+	uint32_t attempt_count;
+	uint8_t exercise_type;
 	uint8_t padding[3];
 
 } ExportExerciseData;
@@ -57,10 +57,17 @@ typedef struct {
 
 typedef struct {
 	char workout_name[MAX_NAME_LEN];
-	uint8_t exercise_count;
-	uint8_t padding[3];
 	ExportExerciseData excercise_data[MAX_EXERCISES];
-
+	u8 workout_type;
+	u8 exercise_count;
+	u16 year;
+	u8 month;
+	u8 day;
+	u8 hour;
+	u8 minute;
+	u8 second;
+	uint8_t padding[3];
+	
 } ExportWorkoutData;
 
 
@@ -5182,6 +5189,9 @@ void Test_Export_Init(GOBJ *menu_gobj)
 	EventMenu *curr_menu = menu_data->currMenu;
 	evMenu *menuAssets = event_vars->menu_assets;
 
+	OSCalendarTime td;
+	OSTicksToCalendarTime(OSGetTime(), &td);
+
 	// create gobj
 	GOBJ *export_gobj = GObj_Create(0, 0, 0);
 	ExportData *export_data = calloc(sizeof(ExportData));
@@ -5234,18 +5244,25 @@ void Test_Export_Init(GOBJ *menu_gobj)
 	// Example: fill it with dummy data
 	strncpy(export_workout_data.workout_name, "test_workout", MAX_NAME_LEN);
 	export_workout_data.exercise_count = 2;
+	export_workout_data.workout_type = 1;
+	export_workout_data.year = td.year;
+	export_workout_data.month = td.mon;
+	export_workout_data.day = td.mday;
+	export_workout_data.hour = td.hour;
+	export_workout_data.minute = td.min;
+	export_workout_data.second = td.sec;
 
 	strncpy(export_workout_data.excercise_data[0].exercise_name, "exercise_1", MAX_NAME_LEN);
 	export_workout_data.excercise_data[0].frames_to_complete = 120;
-	export_workout_data.excercise_data[0].attempt_count = 10;
 	export_workout_data.excercise_data[0].success_count = 4;
-	export_workout_data.excercise_data[0].workout_type = 1;
+	export_workout_data.excercise_data[0].attempt_count = 10;
+	export_workout_data.excercise_data[0].exercise_type = 1;
 
 	strncpy(export_workout_data.excercise_data[1].exercise_name, "exercise_2", MAX_NAME_LEN);
 	export_workout_data.excercise_data[1].frames_to_complete = 85;
-	export_workout_data.excercise_data[1].attempt_count = 7;
 	export_workout_data.excercise_data[1].success_count = 7;
-	export_workout_data.excercise_data[1].workout_type = 2;
+	export_workout_data.excercise_data[1].attempt_count = 7;
+	export_workout_data.excercise_data[1].exercise_type = 2;
 
 	// Determine how many bytes we need to write
 	size_t struct_size = sizeof(ExportWorkoutData);
@@ -5274,8 +5291,7 @@ void Test_Export_Init(GOBJ *menu_gobj)
 	//OSReport("test_export_init mid\n");
 																				
 																				// get curr date
-	OSCalendarTime td;
-	OSTicksToCalendarTime(OSGetTime(), &td);
+	
 
 	// alloc a buffer to transfer to memcard
 	stc_transfer_buf_size = sizeof(ExportHeader) + img_size + sizeof(ExportMenuSettings) + compress_size;
@@ -5635,6 +5651,8 @@ int Test_Export_Process(GOBJ *export_gobj)
 		ExportHeader *header = stc_transfer_buf;
 		char filename[32];
 		//sprintf(filename, tm_filename, header->metadata.month, header->metadata.day, header->metadata.year, header->metadata.hour, header->metadata.minute, header->metadata.second); // generate filename based on date, time, fighters, and stage
+
+		//header->metadata.month, header->metadata.day, header->metadata.year, header->metadata.hour, header->metadata.minute, header->metadata.second
 		
 		strcpy(filename, "pleasework");
 		OSReport("trying save: %s\n", filename);
