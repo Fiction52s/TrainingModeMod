@@ -386,7 +386,7 @@ void Wavedash_Think(WavedashData *event_data, FighterData *hmn_data)
 
                 // updating timing text
                 if (input_frame < ((WDFRAMES - 1) / 2)) // is early
-                    Text_SetText(event_data->hud.text_timing, 0, "%df BLAH", ((WDFRAMES - 1) / 2) - input_frame);
+                    Text_SetText(event_data->hud.text_timing, 0, "%df", ((WDFRAMES - 1) / 2) - input_frame);
                 else if (input_frame == ((WDFRAMES - 1) / 2))
                     Text_SetText(event_data->hud.text_timing, 0, "Perfect");
                 else if (input_frame > ((WDFRAMES - 1) / 2))

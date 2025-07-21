@@ -181,51 +181,53 @@ typedef struct Arch_LabData
     JOBJDesc *export_menu;
     JOBJDesc *export_popup;
 } Arch_LabData;
+
 typedef struct LabData
 {
-    EventDesc *eventInfo;
-    u8 cpu_state;
-    u8 cpu_hitshield;
-    u8 cpu_hitnum;
-    u8 cpu_sdinum;
-    u8 cpu_sdidir;
+	EventDesc *eventInfo;
+	u8 cpu_state;
+	u8 cpu_hitshield;
+	u8 cpu_hitnum;
+	u8 cpu_sdinum;
+	u8 cpu_sdidir;
 
-    // Delay timer for "Counter After Frames" Option
-    u8 cpu_countertimer;
+	// Delay timer for "Counter After Frames" Option
+	u8 cpu_countertimer;
 
-    // Delay timer for "Miss Tech Wait Chance" Option
-    u8 cpu_miss_tech_wait_timer;
+	// Delay timer for "Miss Tech Wait Chance" Option
+	u8 cpu_miss_tech_wait_timer;
 
-    // Aitch: We set this flag if the CPU performs a counter action on this frame.
-    // Occasionally we need to determine if the CPU is countering (such as AUTORESTORE_COUNTER).
-    // However, if the counter action immediately completes, the cpu state is never set to CPUSTATE_COUNTER.
-    // And sometimes the CPU is in the CPUSTATE_COUNTER state but does not act.
-    // This flag is only set if the CPU has counter acted this frame.
-    u8 cpu_countering: 1;
+	// Aitch: We set this flag if the CPU performs a counter action on this frame.
+	// Occasionally we need to determine if the CPU is countering (such as AUTORESTORE_COUNTER).
+	// However, if the counter action immediately completes, the cpu state is never set to CPUSTATE_COUNTER.
+	// And sometimes the CPU is in the CPUSTATE_COUNTER state but does not act.
+	// This flag is only set if the CPU has counter acted this frame.
+	u8 cpu_countering : 1;
 
-    // Aitch: This flag is set per action and prevents air-ground transitions from interrupting the counter action.
-    u8 cpu_countering_no_interrupt: 1;
+	// Aitch: This flag is set per action and prevents air-ground transitions from interrupting the counter action.
+	u8 cpu_countering_no_interrupt : 1;
 
-    // Aitch: This counter needs to be manually set. We can't use the baked in ssbm timer, because
-    // It'll mess with internal ssbm stuff probably. If the timer is not zero, then no tech.stuff
-    // This is set when hit in tumble.
-    int cpu_tech_lockout;
+	// Aitch: This counter needs to be manually set. We can't use the baked in ssbm timer, because
+	// It'll mess with internal ssbm stuff probably. If the timer is not zero, then no tech.stuff
+	// This is set when hit in tumble.
+	int cpu_tech_lockout;
 
-    // We need a place to store the current playback frame when the cpu is set to use a slot as a counter action.
-    u16 counter_slot_frame;
+	// We need a place to store the current playback frame when the cpu is set to use a slot as a counter action.
+	u16 counter_slot_frame;
 
-    s16 cpu_lasthit;
-    s16 cpu_lastshieldstun; // last move instance of the opponent in shield stun. used to tell how many times the shield was hit
-    s8 cpu_hitkind;         // how the CPU was hit, damage or shield
-    u8 cpu_hitshieldnum;    // times the CPUs shield was hit
-    u8 cpu_isactionable;    // flag that indicates if a cpu has become actionable
-    u8 cpu_groundstate;     // indicates if the player was touching ground upon being actionable
-    s32 timer;
-    u8 cpu_isthrown; // bool for if the cpu is being thrown
-    GOBJ *rec_gobj;
-    u8 hmn_controller;
-    u8 cpu_controller;
+	s16 cpu_lasthit;
+	s16 cpu_lastshieldstun; // last move instance of the opponent in shield stun. used to tell how many times the shield was hit
+	s8 cpu_hitkind;         // how the CPU was hit, damage or shield
+	u8 cpu_hitshieldnum;    // times the CPUs shield was hit
+	u8 cpu_isactionable;    // flag that indicates if a cpu has become actionable
+	u8 cpu_groundstate;     // indicates if the player was touching ground upon being actionable
+	s32 timer;
+	u8 cpu_isthrown; // bool for if the cpu is being thrown
+	GOBJ *rec_gobj;
+	u8 hmn_controller;
+	u8 cpu_controller;
 } LabData;
+
 typedef struct LabPersistentData {
     u8 peach_item_rng;      // 0x0
     u8 peach_fsmash_rng;    // 0x1

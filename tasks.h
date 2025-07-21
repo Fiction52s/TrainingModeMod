@@ -61,6 +61,7 @@ struct WavedashData
 	float wd_angle;
 	int wd_attempted;
 	int wd_succeeded;
+	u8 is_target_mode_on;
 	struct
 	{
 		u16 line_index;
@@ -92,6 +93,7 @@ struct TargetData
 	float left;
 	float right;
 	CmSubject *cam;
+	WavedashData *wavedashData;
 };
 
 float Bezier(float time, float start, float end);

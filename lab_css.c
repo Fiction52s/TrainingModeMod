@@ -320,9 +320,11 @@ void Test_Think_SelFile(GOBJ *menu_gobj)
 	}
 
 
-	WavedashData *wd = calloc(sizeof(WavedashData));
-	memset(wd, 0, sizeof(WavedashData));
-	*wavedash_data = wd;
+	
+
+	//OSReport("first test\n");
+	//wd->hud.arrow_prevpos = 0;
+	//OSReport("second test\n");
 
 	WorkoutFile wf;
 	LoadWorkoutInfo(0, saveDataIndex, &wf);

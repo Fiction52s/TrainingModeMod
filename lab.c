@@ -127,6 +127,8 @@ const int LOCKOUT_DURATION = 30;
 static float cpu_locked_percent = 0;
 static float hmn_locked_percent = 0;
 
+static WavedashData *wavedashData;
+
 const int DEFAULT_WORK_DURATION = 60 * 60 * 5;
 
 
@@ -669,6 +671,8 @@ void Lab_ChangeHUD(GOBJ *menu_gobj, int value)
 
 void Lab_Exit(int value)
 {
+	//HSD_Free(wavedashData);
+	//wavedashData = NULL;
     // end game
     stc_match->state = 3;
 
@@ -7035,7 +7039,10 @@ void Event_Init(GOBJ *gobj)
 	currStateFramesRemaining = 0;//DEFAULT_WORK_DURATION;//60 * 10;
 
     LabData *eventData = gobj->userdata;
-	WavedashData *wavedashData = wavedash_data;
+
+	wavedashData = (WavedashData*)calloc(sizeof(WavedashData));
+	memset(wavedashData, 0, sizeof(WavedashData));
+
     EventDesc *eventInfo = eventData->eventInfo;
     GOBJ *hmn = Fighter_GetGObj(0);
     FighterData *hmn_data = hmn->userdata;
@@ -7043,6 +7050,7 @@ void Event_Init(GOBJ *gobj)
     FighterData *cpu_data = cpu->userdata;
     GObj_AddProc(gobj, Event_PostThink, 20);
 
+	wavedashData->is_target_mode_on = true;
 
 	int page = stc_memcard->TM_EventPage;
 	int eventID = stc_memcard->EventBackup.event;
@@ -7070,10 +7078,10 @@ void Event_Init(GOBJ *gobj)
 
 
 
-	//Wavedash_Init(wavedashData);
+	Wavedash_Init(wavedashData);
 	
 
-	//Target_Init(wavedashData, hmn_data);
+	Target_Init(wavedashData, hmn_data);
 
     // Init runtime options...
     
@@ -7213,7 +7221,8 @@ void Event_Init(GOBJ *gobj)
 
 	test_gobj = GObj_Create(0, 0, 0);
 	MenuData *md = calloc(sizeof(MenuData));
-	GObj_AddUserData(test_gobj, 4, HSD_Free, md);	
+	GObj_AddUserData(test_gobj, 4, HSD_Free, md);
+	GObj_AddProc(test_gobj, Task_Think, 15);
 
     // Init DIDraw
     DIDraw_Init();
@@ -7344,24 +7353,25 @@ void Event_Update()
 				}
 				else
 				{
-					Test_Me();
+					//Test_Me();
 					//u8 *test = *workout_states_arr_ptr;
 
-					//Record_MemcardLoad(0, test[workIndex]);
+					LoadedWorkoutInfo *loaded_workout = *workout_info;
+					Record_MemcardLoad(0, loaded_workout->exercise_indexes[workIndex]);
 
-					//LabOptions_Record[OPTREC_SAVE_LOAD] = Record_Load;
+					LabOptions_Record[OPTREC_SAVE_LOAD] = Record_Load;
 
-					//// When we load rwing savestates, we don't want infinite shields by default. This would cause desyncs galore.
-					//LabOptions_CPU[OPTCPU_SHIELD].val = CPUINFSHIELD_OFF;
+					// When we load rwing savestates, we don't want infinite shields by default. This would cause desyncs galore.
+					LabOptions_CPU[OPTCPU_SHIELD].val = CPUINFSHIELD_OFF;
 
-					//++workIndex;
+					++workIndex;
 
-					//if (workIndex >= *workout_states_arr_len)
-					//{
-					//	workIndex = 0;
-					//}
+					if (workIndex >= loaded_workout->workout.exercise_count)
+					{
+						workIndex = 0;
+					}
 
-					//currStateFramesRemaining = 0;//DEFAULT_WORK_DURATION;
+					currStateFramesRemaining = 0;//DEFAULT_WORK_DURATION;
 				}
 
 
@@ -7719,6 +7729,13 @@ void Event_Think_LabState_Normal(GOBJ *event) {
     }
 }
 
+void Task_Think()
+{
+	GOBJ *hmn = Fighter_GetGObj(0);
+	FighterData *hmn_data = hmn->userdata;
+	Wavedash_Think(wavedashData, hmn_data);
+}
+
 // Think Function
 void Event_Think(GOBJ *event)
 {
@@ -7730,17 +7747,16 @@ void Event_Think(GOBJ *event)
     }
 
 	LabData *eventData = event->userdata;
-	WavedashData *wavedashData = wavedash_data;//&eventData->wavedash_data;
 
-											   // get fighter data
+	// get fighter data
 	GOBJ *hmn = Fighter_GetGObj(0);
 	FighterData *hmn_data = hmn->userdata;
 	GOBJ *cpu = Fighter_GetGObj(1);
 
-	if (hmn_data->state_id == ASID_KNEEBEND)
+	/*if (hmn_data->state_id == ASID_KNEEBEND)
 	{
 		OSReport("WHY knee bend. frame: %i\n", hmn_data->TM.state_frame);
-	}
+	}*/
 
 
 	FighterData *cpu_data = cpu->userdata;
@@ -7749,12 +7765,6 @@ void Event_Think(GOBJ *event)
 	//Wavedash_Think(wavedashData, hmn_data);
 
     Lab_CustomOSDsThink();
-
-    
-    
-
-	
-	
 
 
 
