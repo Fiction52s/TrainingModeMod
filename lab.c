@@ -4813,6 +4813,7 @@ void TryLoadSaveData(int slot, int file_no)
 void Record_MemcardLoad(int slot, int file_no)
 {
 	OSReport("starting cardLoad: slot: %x\tfile_no: %x\n", (u32)slot, (u32)file_no);
+
     // search card for this save file
     u8 file_found = 0;
     char filename[32];
@@ -4858,6 +4859,7 @@ void Record_MemcardLoad(int slot, int file_no)
     }
 
 	OSReport("here 1\n");
+	//OSReport("Wavedash_Init huh7: %u\n", (u32)wavedashData->hud.gobj);
     // if found, load it
     if (file_found == 1)
     {
@@ -4870,6 +4872,7 @@ void Record_MemcardLoad(int slot, int file_no)
         memcard_save.xc = -1;
 
 		OSReport("here %s\n", stc_memcard_info->file_name);
+
 
         Memcard_ReqSaveLoad(slot, filename, &memcard_save, &stc_memcard_info->file_name, 0, 0, 0);
 
@@ -4887,7 +4890,6 @@ void Record_MemcardLoad(int slot, int file_no)
         // if file loaded successfully
         if (memcard_status == 0)
         {
-			
             // enable other options
             for (int i = 1; i < sizeof(LabOptions_Record) / sizeof(EventOption); i++)
             {
@@ -7024,12 +7026,16 @@ void Event_PostThink(GOBJ *gobj)
     Stage_Think();
 }
 
+
+
+
 // Init Function
 void Event_Init(GOBJ *gobj)
 {
 	currStateFramesRemaining = 0;//DEFAULT_WORK_DURATION;//60 * 10;
 
     LabData *eventData = gobj->userdata;
+	WavedashData *wavedashData = wavedash_data;
     EventDesc *eventInfo = eventData->eventInfo;
     GOBJ *hmn = Fighter_GetGObj(0);
     FighterData *hmn_data = hmn->userdata;
@@ -7037,8 +7043,37 @@ void Event_Init(GOBJ *gobj)
     FighterData *cpu_data = cpu->userdata;
     GObj_AddProc(gobj, Event_PostThink, 20);
 
+
+	int page = stc_memcard->TM_EventPage;
+	int eventID = stc_memcard->EventBackup.event;
+	//EventDesc *event_desc = GetEventDesc(page, eventID);
+	evFunction evFunction;// = &stc_event_vars.evFunction;
+
+	// clear evFunction
+	memset(&evFunction, 0, sizeof(evFunction));
+
+	// append extension
+	//static char *extension = //"TM/%s.dat";
+	char *buffer = "TM/wavedash.dat";
+	//sprintf(buffer, extension, event_desc->eventFile);
+
+	// load this events file
+	HSD_Archive *archive = MEX_LoadRelArchive(buffer, &evFunction, "evFunction");
+	//stc_event_vars.event_archive = archive;
+
+	// get wavedash assets
+	wavedashData->assets = Archive_GetPublicAddress(archive, "wavedash");
+
+	/*LabData *event_data = event_vars->event_gobj->userdata;
+	WavedashData *wavedashData = &event_data->wavedash_data;
+	OSReport("Record_LoadSavestate huh: %u\n", (u32)wavedashData->hud.gobj);*/
+
+
+
+	//Wavedash_Init(wavedashData);
 	
-	
+
+	//Target_Init(wavedashData, hmn_data);
 
     // Init runtime options...
     
@@ -7164,6 +7199,7 @@ void Event_Init(GOBJ *gobj)
     event_vars->savestate_saved_while_mirrored = false;
     event_vars->loaded_mirrored = false;
 
+
     // get this events assets
     stc_lab_data = Archive_GetPublicAddress(event_vars->event_archive, "lab");
 
@@ -7177,8 +7213,7 @@ void Event_Init(GOBJ *gobj)
 
 	test_gobj = GObj_Create(0, 0, 0);
 	MenuData *md = calloc(sizeof(MenuData));
-	GObj_AddUserData(test_gobj, 4, HSD_Free, md);
-	
+	GObj_AddUserData(test_gobj, 4, HSD_Free, md);	
 
     // Init DIDraw
     DIDraw_Init();
@@ -7208,7 +7243,7 @@ void Event_Init(GOBJ *gobj)
 
 	LoadedWorkoutInfo *loaded_workout = *workout_info;
 
-	if (loaded_workout->workout.exercise_count > 0)
+	if(loaded_workout->workout.exercise_count > 0)
 	{
 		//u8 *test = *workout_info->exercise_indexes;
 
@@ -7694,21 +7729,35 @@ void Event_Think(GOBJ *event)
         event_vars->savestate_saved_while_mirrored = event_vars->loaded_mirrored;
     }
 
+	LabData *eventData = event->userdata;
+	WavedashData *wavedashData = wavedash_data;//&eventData->wavedash_data;
+
+											   // get fighter data
+	GOBJ *hmn = Fighter_GetGObj(0);
+	FighterData *hmn_data = hmn->userdata;
+	GOBJ *cpu = Fighter_GetGObj(1);
+
+	if (hmn_data->state_id == ASID_KNEEBEND)
+	{
+		OSReport("WHY knee bend. frame: %i\n", hmn_data->TM.state_frame);
+	}
 
 
+	FighterData *cpu_data = cpu->userdata;
+	HSD_Pad *pad = PadGet(hmn_data->pad_index, PADGET_ENGINE);
 
-    
-    LabData *eventData = event->userdata;
+	//Wavedash_Think(wavedashData, hmn_data);
 
     Lab_CustomOSDsThink();
 
-    // get fighter data
-    GOBJ *hmn = Fighter_GetGObj(0);
-    FighterData *hmn_data = hmn->userdata;
-    GOBJ *cpu = Fighter_GetGObj(1);
-    FighterData *cpu_data = cpu->userdata;
-    HSD_Pad *pad = PadGet(hmn_data->pad_index, PADGET_ENGINE);
     
+    
+
+	
+	
+
+
+
 
     // We allow negative values to track how long we have not been in lockout for.
     // If the CPU is in hitlag, do not finish the lockout. This prevents insta techs

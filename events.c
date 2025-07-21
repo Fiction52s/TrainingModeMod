@@ -756,6 +756,8 @@ void EventLoad(void)
     char *buffer[20];
     sprintf(buffer, extension, event_desc->eventFile);
 
+	OSReport("name: %s\n", buffer);
+
     // load this events file
     HSD_Archive *archive = MEX_LoadRelArchive(buffer, evFunction, "evFunction");
     stc_event_vars.event_archive = archive;

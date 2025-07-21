@@ -1,5 +1,6 @@
-#include "../MexTK/mex.h"
-#include "events.h"
+//#include "../MexTK/mex.h"
+//#include "events.h"
+#include "tasks.h"
 
 // Labbing event
 // Custom TDI definitions
@@ -601,7 +602,7 @@ typedef struct
 
 // CSS Import
 LoadedWorkoutInfo **workout_info = R13 + (-0x4670);
-u8 *workout_states_arr_len = R13 + (-0x466F);
+WavedashData **wavedash_data = R13 + (-0x466F);
 //s8 *onload_fileno = R13 + (-0x4670);
 //s8 *onload_slot = R13 + (-0x466F);
 #define IMPORT_FILESPERPAGE 127//10

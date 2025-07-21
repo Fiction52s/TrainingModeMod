@@ -319,12 +319,18 @@ void Test_Think_SelFile(GOBJ *menu_gobj)
 		}
 	}
 
+
+	WavedashData *wd = calloc(sizeof(WavedashData));
+	memset(wd, 0, sizeof(WavedashData));
+	*wavedash_data = wd;
+
 	WorkoutFile wf;
 	LoadWorkoutInfo(0, saveDataIndex, &wf);
 
 
 	//int workoutLength = sizeof(foxWorkout1Files) / sizeof(foxWorkout1Files[0]);
 	int workoutLength = wf.workouts[0].exercise_count;
+
 
 	LoadedWorkoutInfo *loaded_workout_info = calloc(sizeof(LoadedWorkoutInfo));
 
@@ -538,7 +544,7 @@ void OnCSSLoad(HSD_Archive *archive)
 	event_desc = GetEventDesc(1, 0);
 	event_desc->stage = -1;
 	//*onload_fileno = -1;
-	*workout_states_arr_len = 0;
+	//*workout_states_arr_len = 0;
 
 	testThinkPhase = 0;
 	GObj_AddProc(cam_gobj, Test_Think, 1);
