@@ -62,6 +62,12 @@ struct WavedashData
 	int wd_attempted;
 	int wd_succeeded;
 	u8 is_target_mode_on;
+
+
+	u8 is_dash_dancing;
+	u8 dash_dances_succeeded;
+	u8 dash_dance_event_success;
+
 	struct
 	{
 		u16 line_index;
@@ -105,5 +111,7 @@ void Target_Think(GOBJ *target_gobj);
 void Wavedash_HUDCamThink(GOBJ *gobj);
 void Event_Exit();
 void Wavedash_Init(WavedashData *event_data);
-void Wavedash_Think(WavedashData *event_data, FighterData *hmn_data);
+void Wavedash_Think(WavedashData *event_data, FighterData *hmn_data);\
+void Dash_Dance_Think(WavedashData *event_data, FighterData *hmn_data);
+void JCGrab_Think(WavedashData *event_data, FighterData *hmn_data);
 

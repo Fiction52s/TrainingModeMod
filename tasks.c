@@ -106,6 +106,27 @@ void Old_Event_Exit()
     Match_EndVS();
 }
 
+void Update_Arrow(WavedashData *event_data)
+{
+	JOBJ *hud_jobj = event_data->hud.gobj->hsd_object;
+	// update arrow animation
+	if (event_data->hud.arrow_timer > 0)
+	{
+		// decrement timer
+		event_data->hud.arrow_timer--;
+
+		// get this frames position
+		float time = 1 - ((float)event_data->hud.arrow_timer / (float)WDARROW_ANIMFRAMES);
+		float xpos = Bezier(time, event_data->hud.arrow_prevpos, event_data->hud.arrow_nextpos);
+
+		// update position
+		JOBJ *arrow_jobj;
+		JOBJ_GetChild(hud_jobj, &arrow_jobj, WDJOBJ_ARROW, -1); // get timing bar jobj
+		arrow_jobj->trans.X = xpos;
+		JOBJ_SetMtxDirtySub(arrow_jobj);
+	}
+}
+
 // Event functions
 void Wavedash_Init(WavedashData *event_data)
 {
@@ -291,131 +312,13 @@ void Wavedash_Think(WavedashData *event_data, FighterData *hmn_data)
             {
                 is_finished = 1;
                 mat_anim = event_data->assets->hudmatanim[1];
-                SFX_PlayCommon(3);
-
-                // restore position
-                int ray_index;
-                int ray_kind;
-                Vec2 ray_angle;
-                Vec3 ray_pos;
-                float from_x = event_data->restore.pos.X;
-                float to_x = from_x;
-                float from_y = event_data->restore.pos.Y + 3;
-                float to_y = from_y - 6;
-                int is_ground = GrColl_RaycastGround(&ray_pos, &ray_index, &ray_kind, &ray_angle, -1, -1, -1, 0, from_x, from_y, to_x, to_y, 0);
-                if ((is_ground == 1) && (ray_index == event_data->restore.line_index))
-                {
-                    // do this for every subfighter (thanks for complicated code ice climbers)
-                    for (int i = 0; i < 2; i++)
-                    {
-                        GOBJ *this_fighter = Fighter_GetSubcharGObj(hmn_data->ply, i);
-
-                        if (this_fighter != 0)
-                        {
-
-                            FighterData *this_fighter_data = this_fighter->userdata;
-
-                            if ((this_fighter_data->flags.sleep == 0) && (this_fighter_data->flags.dead == 0))
-                            {
-
-                                // place CPU here
-                                this_fighter_data->phys.pos = ray_pos;
-                                this_fighter_data->coll_data.ground_index = ray_index;
-
-                                // set grounded
-                                this_fighter_data->phys.air_state = 0;
-                                //Fighter_SetGrounded(this_fighter);
-
-                                // kill velocity
-                                Fighter_KillAllVelocity(this_fighter);
-
-                                // enter wait
-                                ActionStateChange(0, 1, -1, this_fighter, ASID_WAIT, 0, 0);
-                                this_fighter_data->state.blend = 0;
-
-                                // update ECB
-                                this_fighter_data->coll_data.topN_Curr = this_fighter_data->phys.pos; // move current ECB location to new position
-                                Coll_ECBCurrToPrev(&this_fighter_data->coll_data);
-                                this_fighter_data->cb.Coll(this_fighter);
-
-                                // update camera box
-                                Fighter_UpdateCameraBox(this_fighter);
-                                this_fighter_data->camera_subject->boundleft_curr = this_fighter_data->camera_subject->boundleft_proj;
-                                this_fighter_data->camera_subject->boundright_curr = this_fighter_data->camera_subject->boundright_proj;
-
-                                // init CPU logic (for nana's popo position history...)
-                                int cpu_kind = Fighter_GetCPUKind(this_fighter_data->ply);
-                                int cpu_level = Fighter_GetCPULevel(this_fighter_data->ply);
-                                Fighter_CPUInitialize(this_fighter_data, cpu_kind, cpu_level, 0);
-
-                                // place subfighter in the Z axis
-                                if (this_fighter_data->flags.ms == 1)
-                                {
-                                    ftCommonData *ft_common = *stc_ftcommon;
-                                    this_fighter_data->phys.pos.Z = ft_common->ms_zjostle_max * -1;
-                                }
-                            }
-                        }
-                    }
-
-                    // update camera
-                    Match_CorrectCamera();
-                }
+				Fail_Task(event_data);
             }
 
             // update bar
             if (is_finished)
             {
-                // reset variables
-                event_data->timer = -1;
-                event_data->is_airdodge = 0;
-                event_data->is_early_airdodge = 0;
-
-
-                // update bar frame colors
-                JOBJ *arrow_jobj;
-                JOBJ_GetChild(hud_jobj, &arrow_jobj, WDJOBJ_ARROW, -1); // get timing bar jobj
-                // get in terms of bar timeframe
-                int jump_frame = ((WDFRAMES - 1) / 2) - (int)hmn_data->attr.jump_startup_time;
-                int input_frame = jump_frame + event_data->airdodge_frame - 1;
-
-                // update arrow position
-                if (input_frame < WDFRAMES)
-                {
-                    event_data->hud.arrow_prevpos = arrow_jobj->trans.X;
-                    event_data->hud.arrow_nextpos = (-WDARROW_OFFSET * ((WDFRAMES - 1) / 2)) + (input_frame * 0.36);
-                    JOBJ_ClearFlags(arrow_jobj, JOBJ_HIDDEN);
-                    event_data->hud.arrow_timer = WDARROW_ANIMFRAMES;
-                }
-                // hide arrow for this wd attempt
-                else
-                {
-                    event_data->hud.arrow_timer = 0;
-                    arrow_jobj->trans.X = 0;
-                    JOBJ_SetFlags(arrow_jobj, JOBJ_HIDDEN);
-                }
-
-                // updating timing text
-                if (input_frame < ((WDFRAMES - 1) / 2)) // is early
-                    Text_SetText(event_data->hud.text_timing, 0, "%df", ((WDFRAMES - 1) / 2) - input_frame);
-                else if (input_frame == ((WDFRAMES - 1) / 2))
-                    Text_SetText(event_data->hud.text_timing, 0, "Perfect");
-                else if (input_frame > ((WDFRAMES - 1) / 2))
-                    Text_SetText(event_data->hud.text_timing, 0, "%df Late", input_frame - ((WDFRAMES - 1) / 2));
-
-                // update airdodge angle
-                Text_SetText(event_data->hud.text_angle, 0, "%.2f", fabs(event_data->wd_angle / M_1DEGREE));
-
-                // update succession
-                event_data->wd_attempted++;
-                int successful = event_data->wd_succeeded;
-                float succession = ((float)event_data->wd_succeeded / (float)event_data->wd_attempted) * 100.0;
-                Text_SetText(event_data->hud.text_succession, 0, "%d (%.2f%)", successful, succession);
-
-                // apply HUD animation
-                JOBJ_RemoveAnimAll(hud_jobj);
-                JOBJ_AddAnimAll(hud_jobj, 0, mat_anim, 0);
-                JOBJ_ReqAnimAll(hud_jobj, 0);
+				Reset_Task(event_data);
             }
         }
     }
@@ -428,23 +331,484 @@ void Wavedash_Think(WavedashData *event_data, FighterData *hmn_data)
     // update HUD anim
     JOBJ_AnimAll(hud_jobj);
 
-    // update arrow animation
-    if (event_data->hud.arrow_timer > 0)
-    {
-        // decrement timer
-        event_data->hud.arrow_timer--;
-
-        // get this frames position
-        float time = 1 - ((float)event_data->hud.arrow_timer / (float)WDARROW_ANIMFRAMES);
-        float xpos = Bezier(time, event_data->hud.arrow_prevpos, event_data->hud.arrow_nextpos);
-
-        // update position
-        JOBJ *arrow_jobj;
-        JOBJ_GetChild(hud_jobj, &arrow_jobj, WDJOBJ_ARROW, -1); // get timing bar jobj
-        arrow_jobj->trans.X = xpos;
-        JOBJ_SetMtxDirtySub(arrow_jobj);
-    }
+	Update_Arrow(event_data);
+    
 }
+
+void Reset_Task(WavedashData *event_data)
+{
+	// reset variables
+	event_data->timer = -1;
+	event_data->is_airdodge = 0;
+	event_data->is_early_airdodge = 0;
+
+	void *mat_anim = event_data->assets->hudmatanim[1];
+
+	FighterData *hmn_data = Fighter_GetGObj(0)->userdata;
+	JOBJ *hud_jobj = event_data->hud.gobj->hsd_object;
+
+	// update bar frame colors
+	JOBJ *arrow_jobj;
+	JOBJ_GetChild(hud_jobj, &arrow_jobj, WDJOBJ_ARROW, -1); // get timing bar jobj
+															// get in terms of bar timeframe
+	int jump_frame = ((WDFRAMES - 1) / 2) - (int)hmn_data->attr.jump_startup_time;
+	int input_frame = jump_frame + event_data->airdodge_frame - 1;
+
+	// update arrow position
+	if (input_frame < WDFRAMES)
+	{
+		event_data->hud.arrow_prevpos = arrow_jobj->trans.X;
+		event_data->hud.arrow_nextpos = (-WDARROW_OFFSET * ((WDFRAMES - 1) / 2)) + (input_frame * 0.36);
+		JOBJ_ClearFlags(arrow_jobj, JOBJ_HIDDEN);
+		event_data->hud.arrow_timer = WDARROW_ANIMFRAMES;
+	}
+	// hide arrow for this wd attempt
+	else
+	{
+		event_data->hud.arrow_timer = 0;
+		arrow_jobj->trans.X = 0;
+		JOBJ_SetFlags(arrow_jobj, JOBJ_HIDDEN);
+	}
+
+	// updating timing text
+	if (input_frame < ((WDFRAMES - 1) / 2)) // is early
+		Text_SetText(event_data->hud.text_timing, 0, "%df", ((WDFRAMES - 1) / 2) - input_frame);
+	else if (input_frame == ((WDFRAMES - 1) / 2))
+		Text_SetText(event_data->hud.text_timing, 0, "Perfect");
+	else if (input_frame >((WDFRAMES - 1) / 2))
+		Text_SetText(event_data->hud.text_timing, 0, "%df Late", input_frame - ((WDFRAMES - 1) / 2));
+
+	// update airdodge angle
+	Text_SetText(event_data->hud.text_angle, 0, "%.2f", fabs(event_data->wd_angle / M_1DEGREE));
+
+	// update succession
+	event_data->wd_attempted++;
+	int successful = event_data->wd_succeeded;
+
+	//float succession = event_data->dash_dances_succeeded;
+	Text_SetText(event_data->hud.text_succession, 0, "%u / 10", event_data->dash_dances_succeeded);
+
+	//float succession = ((float)event_data->wd_succeeded / (float)event_data->wd_attempted) * 100.0;
+	//Text_SetText(event_data->hud.text_succession, 0, "%d (%.2f%)", successful, succession);
+
+	// apply HUD animation
+	JOBJ_RemoveAnimAll(hud_jobj);
+	JOBJ_AddAnimAll(hud_jobj, 0, mat_anim, 0);
+	JOBJ_ReqAnimAll(hud_jobj, 0);
+}
+
+void Fail_Task(WavedashData *event_data)
+{
+	//is_finished = 1;
+	void *mat_anim = event_data->assets->hudmatanim[1];
+	FighterData *hmn_data = Fighter_GetGObj(0)->userdata;
+	SFX_PlayCommon(3);
+
+	OSReport("fail_task\n");
+
+	// restore position
+	int ray_index;
+	int ray_kind;
+	Vec2 ray_angle;
+	Vec3 ray_pos;
+	float from_x = event_data->restore.pos.X;
+	float to_x = from_x;
+	float from_y = event_data->restore.pos.Y + 3;
+	float to_y = from_y - 6;
+	int is_ground = GrColl_RaycastGround(&ray_pos, &ray_index, &ray_kind, &ray_angle, -1, -1, -1, 0, from_x, from_y, to_x, to_y, 0);
+	if ((is_ground == 1) && (ray_index == event_data->restore.line_index))
+	{
+		OSReport("is_Ground\n");
+		// do this for every subfighter (thanks for complicated code ice climbers)
+		for (int i = 0; i < 2; i++)
+		{
+			GOBJ *this_fighter = Fighter_GetSubcharGObj(hmn_data->ply, i);
+
+			if (this_fighter != 0)
+			{
+
+				FighterData *this_fighter_data = this_fighter->userdata;
+
+				if ((this_fighter_data->flags.sleep == 0) && (this_fighter_data->flags.dead == 0))
+				{
+
+					// place CPU here
+					this_fighter_data->phys.pos = ray_pos;
+					this_fighter_data->coll_data.ground_index = ray_index;
+
+					// set grounded
+					this_fighter_data->phys.air_state = 0;
+					//Fighter_SetGrounded(this_fighter);
+
+					// kill velocity
+					Fighter_KillAllVelocity(this_fighter);
+
+					// enter wait
+					ActionStateChange(0, 1, -1, this_fighter, ASID_WAIT, 0, 0);
+					this_fighter_data->state.blend = 0;
+
+					// update ECB
+					this_fighter_data->coll_data.topN_Curr = this_fighter_data->phys.pos; // move current ECB location to new position
+					Coll_ECBCurrToPrev(&this_fighter_data->coll_data);
+					this_fighter_data->cb.Coll(this_fighter);
+
+					// update camera box
+					Fighter_UpdateCameraBox(this_fighter);
+					this_fighter_data->camera_subject->boundleft_curr = this_fighter_data->camera_subject->boundleft_proj;
+					this_fighter_data->camera_subject->boundright_curr = this_fighter_data->camera_subject->boundright_proj;
+
+					// init CPU logic (for nana's popo position history...)
+					int cpu_kind = Fighter_GetCPUKind(this_fighter_data->ply);
+					int cpu_level = Fighter_GetCPULevel(this_fighter_data->ply);
+					Fighter_CPUInitialize(this_fighter_data, cpu_kind, cpu_level, 0);
+
+					// place subfighter in the Z axis
+					if (this_fighter_data->flags.ms == 1)
+					{
+						ftCommonData *ft_common = *stc_ftcommon;
+						this_fighter_data->phys.pos.Z = ft_common->ms_zjostle_max * -1;
+					}
+				}
+			}
+		}
+
+		// update camera
+		Match_CorrectCamera();
+	}
+}
+
+void Dash_Dance_Think(WavedashData *event_data, FighterData *hmn_data)
+{
+	if (event_data->dash_dances_succeeded == 10)
+	{
+		event_data->dash_dance_event_success = 1;
+		return;
+	}
+
+	if (hmn_data->state_id == ASID_DASH && event_data->is_dash_dancing == 0)
+	{
+		event_data->is_dash_dancing = 1;
+		event_data->dash_dances_succeeded = 0;
+		// save line and position
+		event_data->restore.pos.X = hmn_data->phys.pos.X;
+		event_data->restore.pos.Y = hmn_data->phys.pos.Y;
+		event_data->restore.line_index = hmn_data->coll_data.ground_index;
+	}
+	
+	if (event_data->is_dash_dancing == 1)
+	{
+		if (hmn_data->state_id != ASID_DASH && hmn_data->state_id != ASID_TURN)
+		{
+			Fail_Task(event_data);
+			Reset_Task(event_data);
+			event_data->is_dash_dancing = 0;
+			//return;
+		}
+	}
+
+	JOBJ *hud_jobj = event_data->hud.gobj->hsd_object;
+
+	Text_SetText(event_data->hud.text_succession, 0, "%u / 10", event_data->dash_dances_succeeded);
+
+	// update target
+	Target_Manager(event_data, hmn_data);
+
+	// run tip logic
+	Tips_Think(event_data, hmn_data);
+
+	// update HUD anim
+	JOBJ_AnimAll(hud_jobj);
+
+	Update_Arrow(event_data);
+
+}
+
+
+void JCGrab_Think(WavedashData *event_data, FighterData *hmn_data)
+{
+	if ((hmn_data->state_id == ASID_CATCH && hmn_data->TM.state_frame == 0) && hmn_data->TM.state_prev[0] == ASID_KNEEBEND)
+	{
+
+		OSReport("JC Grab!\n");
+		//event_data->is_wavedashing = 1;
+		//event_data->since_wavedash = 0;
+	}
+
+	return;
+	// check to enter is_wavedashing
+	if (event_data->is_wavedashing == 0)
+	{
+		// increment time since wavedash
+		if (event_data->since_wavedash < 255)
+			event_data->since_wavedash++;
+
+		// check to enter wavedash state
+		if ((hmn_data->state_id == ASID_LANDING) && hmn_data->TM.state_prev[2] == ASID_KNEEBEND)
+		{
+			event_data->is_wavedashing = 1;
+			event_data->since_wavedash = 0;
+		}
+
+		// check to null timer
+		if (((hmn_data->state_id >= ASID_WALKSLOW) && (hmn_data->state_id <= ASID_KNEEBEND)) ||                    // no ground movement or jumping
+			(hmn_data->phys.air_state == 1) ||                                                               // airborne
+			((hmn_data->atk_kind >= ATKKIND_SPECIALN) && (hmn_data->atk_kind <= ATKKIND_SPECIALLW)) || // any special move
+			((hmn_data->state_id >= ASID_ESCAPEF) && (hmn_data->state_id >= ASID_ESCAPEB)))                        // rolls
+			event_data->since_wavedash = 255;
+	}
+	// check to exit is_wavedashing
+	if (event_data->is_wavedashing == 1)
+	{
+		if ((hmn_data->state_id != ASID_LANDINGFALLSPECIAL))
+			event_data->is_wavedashing = 0;
+	}
+
+
+
+	//OSReport("is_wavedashing: %d since_wavedash: %d", event_data->is_wavedashing, event_data->since_wavedash);
+	GOBJ *test = event_data->hud.gobj;
+
+	JOBJ *hud_jobj = event_data->hud.gobj->hsd_object;
+
+	// start sequence on jump squat
+	if ((hmn_data->state_id == ASID_KNEEBEND) && (hmn_data->TM.state_frame == 0))
+	{
+		event_data->is_airdodge = 0;
+
+		// start timer
+		event_data->timer = 0;
+
+		// save line and position
+		event_data->restore.pos.X = hmn_data->phys.pos.X;
+		event_data->restore.pos.Y = hmn_data->phys.pos.Y;
+		event_data->restore.line_index = hmn_data->coll_data.ground_index;
+	}
+
+
+
+	// if sequence started
+	if (event_data->timer >= 0)
+	{
+		event_data->timer++; // inc timer
+
+							 // if grounded and not in kneebend, stop sequence
+		if ((hmn_data->state_id != ASID_KNEEBEND) && (hmn_data->state_id != ASID_LANDINGFALLSPECIAL) && (hmn_data->phys.air_state == 0))
+		{
+			event_data->timer = -1;
+			event_data->is_airdodge = 0;
+			event_data->is_early_airdodge = 0;
+		}
+
+		// run sequence logic
+		else
+		{
+
+			// catch early airdodge input
+			if (hmn_data->input.down & (PAD_TRIGGER_L | PAD_TRIGGER_R))
+			{
+				event_data->airdodge_frame = event_data->timer; // save airdodge frame
+				event_data->is_early_airdodge = 1;
+			}
+
+			// save airdodge angle
+			if ((event_data->is_airdodge == 0) &&
+				(((hmn_data->state_id == ASID_ESCAPEAIR) && (hmn_data->TM.state_frame == 0)) || // if entered airdodge
+				((hmn_data->state_id == ASID_LANDINGFALLSPECIAL) && (hmn_data->TM.state_frame == 0) && (hmn_data->TM.state_prev[0] == ASID_ESCAPEAIR) && (hmn_data->TM.state_prev_frames[0] == 0))))
+			{
+				// save airdodge angle
+				Vec2 lstick = hmn_data->input.lstick;
+				event_data->wd_angle = atan2(fabs(lstick.Y), fabs(lstick.X));
+
+				event_data->is_early_airdodge = 0;
+				event_data->is_airdodge = 1;
+				event_data->airdodge_frame = event_data->timer; // save airdodge frame
+			}
+
+			int is_finished = 0;
+			void *mat_anim = 0;
+
+			// look for successful WD
+			if ((hmn_data->state_id == ASID_LANDINGFALLSPECIAL) && (hmn_data->TM.state_frame == 0) && // is in special landing
+				(hmn_data->TM.state_prev[0] == ASID_ESCAPEAIR) &&                                  // came from airdodge
+				(hmn_data->TM.state_prev[2] == ASID_KNEEBEND))                                     // came from jump
+			{
+				is_finished = 1;
+				mat_anim = event_data->assets->hudmatanim[0];
+				event_data->wd_succeeded++;
+
+				// check for perfect
+				if (event_data->airdodge_frame == ((int)hmn_data->attr.jump_startup_time + 1))
+					SFX_Play(303);
+			}
+
+
+			// look for failed WD
+			else if ((event_data->is_early_airdodge == 1) && (((hmn_data->state_id == ASID_JUMPF) || (hmn_data->state_id == ASID_JUMPB)) && (hmn_data->TM.state_frame >= 10)) ||
+				((hmn_data->state_id == ASID_ESCAPEAIR) && (hmn_data->TM.state_frame >= 10) && (hmn_data->TM.state_prev[1] == ASID_KNEEBEND)))
+			{
+				is_finished = 1;
+				mat_anim = event_data->assets->hudmatanim[1];
+				SFX_PlayCommon(3);
+
+				// restore position
+				int ray_index;
+				int ray_kind;
+				Vec2 ray_angle;
+				Vec3 ray_pos;
+				float from_x = event_data->restore.pos.X;
+				float to_x = from_x;
+				float from_y = event_data->restore.pos.Y + 3;
+				float to_y = from_y - 6;
+				int is_ground = GrColl_RaycastGround(&ray_pos, &ray_index, &ray_kind, &ray_angle, -1, -1, -1, 0, from_x, from_y, to_x, to_y, 0);
+				if ((is_ground == 1) && (ray_index == event_data->restore.line_index))
+				{
+					// do this for every subfighter (thanks for complicated code ice climbers)
+					for (int i = 0; i < 2; i++)
+					{
+						GOBJ *this_fighter = Fighter_GetSubcharGObj(hmn_data->ply, i);
+
+						if (this_fighter != 0)
+						{
+
+							FighterData *this_fighter_data = this_fighter->userdata;
+
+							if ((this_fighter_data->flags.sleep == 0) && (this_fighter_data->flags.dead == 0))
+							{
+
+								// place CPU here
+								this_fighter_data->phys.pos = ray_pos;
+								this_fighter_data->coll_data.ground_index = ray_index;
+
+								// set grounded
+								this_fighter_data->phys.air_state = 0;
+								//Fighter_SetGrounded(this_fighter);
+
+								// kill velocity
+								Fighter_KillAllVelocity(this_fighter);
+
+								// enter wait
+								ActionStateChange(0, 1, -1, this_fighter, ASID_WAIT, 0, 0);
+								this_fighter_data->state.blend = 0;
+
+								// update ECB
+								this_fighter_data->coll_data.topN_Curr = this_fighter_data->phys.pos; // move current ECB location to new position
+								Coll_ECBCurrToPrev(&this_fighter_data->coll_data);
+								this_fighter_data->cb.Coll(this_fighter);
+
+								// update camera box
+								Fighter_UpdateCameraBox(this_fighter);
+								this_fighter_data->camera_subject->boundleft_curr = this_fighter_data->camera_subject->boundleft_proj;
+								this_fighter_data->camera_subject->boundright_curr = this_fighter_data->camera_subject->boundright_proj;
+
+								// init CPU logic (for nana's popo position history...)
+								int cpu_kind = Fighter_GetCPUKind(this_fighter_data->ply);
+								int cpu_level = Fighter_GetCPULevel(this_fighter_data->ply);
+								Fighter_CPUInitialize(this_fighter_data, cpu_kind, cpu_level, 0);
+
+								// place subfighter in the Z axis
+								if (this_fighter_data->flags.ms == 1)
+								{
+									ftCommonData *ft_common = *stc_ftcommon;
+									this_fighter_data->phys.pos.Z = ft_common->ms_zjostle_max * -1;
+								}
+							}
+						}
+					}
+
+					// update camera
+					Match_CorrectCamera();
+				}
+			}
+
+			// update bar
+			if (is_finished)
+			{
+				// reset variables
+				event_data->timer = -1;
+				event_data->is_airdodge = 0;
+				event_data->is_early_airdodge = 0;
+
+
+				// update bar frame colors
+				JOBJ *arrow_jobj;
+				JOBJ_GetChild(hud_jobj, &arrow_jobj, WDJOBJ_ARROW, -1); // get timing bar jobj
+																		// get in terms of bar timeframe
+				int jump_frame = ((WDFRAMES - 1) / 2) - (int)hmn_data->attr.jump_startup_time;
+				int input_frame = jump_frame + event_data->airdodge_frame - 1;
+
+				// update arrow position
+				if (input_frame < WDFRAMES)
+				{
+					event_data->hud.arrow_prevpos = arrow_jobj->trans.X;
+					event_data->hud.arrow_nextpos = (-WDARROW_OFFSET * ((WDFRAMES - 1) / 2)) + (input_frame * 0.36);
+					JOBJ_ClearFlags(arrow_jobj, JOBJ_HIDDEN);
+					event_data->hud.arrow_timer = WDARROW_ANIMFRAMES;
+				}
+				// hide arrow for this wd attempt
+				else
+				{
+					event_data->hud.arrow_timer = 0;
+					arrow_jobj->trans.X = 0;
+					JOBJ_SetFlags(arrow_jobj, JOBJ_HIDDEN);
+				}
+
+				// updating timing text
+				if (input_frame < ((WDFRAMES - 1) / 2)) // is early
+					Text_SetText(event_data->hud.text_timing, 0, "%df", ((WDFRAMES - 1) / 2) - input_frame);
+				else if (input_frame == ((WDFRAMES - 1) / 2))
+					Text_SetText(event_data->hud.text_timing, 0, "Perfect");
+				else if (input_frame >((WDFRAMES - 1) / 2))
+					Text_SetText(event_data->hud.text_timing, 0, "%df Late", input_frame - ((WDFRAMES - 1) / 2));
+
+				// update airdodge angle
+				Text_SetText(event_data->hud.text_angle, 0, "%.2f", fabs(event_data->wd_angle / M_1DEGREE));
+
+				// update succession
+				event_data->wd_attempted++;
+				int successful = event_data->wd_succeeded;
+				float succession = ((float)event_data->wd_succeeded / (float)event_data->wd_attempted) * 100.0;
+				Text_SetText(event_data->hud.text_succession, 0, "%d (%.2f%)", successful, succession);
+				
+			
+
+				// apply HUD animation
+				JOBJ_RemoveAnimAll(hud_jobj);
+				JOBJ_AddAnimAll(hud_jobj, 0, mat_anim, 0);
+				JOBJ_ReqAnimAll(hud_jobj, 0);
+			}
+		}
+	}
+	// update target
+	Target_Manager(event_data, hmn_data);
+
+	// run tip logic
+	Tips_Think(event_data, hmn_data);
+
+	// update HUD anim
+	JOBJ_AnimAll(hud_jobj);
+
+	// update arrow animation
+	if (event_data->hud.arrow_timer > 0)
+	{
+		// decrement timer
+		event_data->hud.arrow_timer--;
+
+		// get this frames position
+		float time = 1 - ((float)event_data->hud.arrow_timer / (float)WDARROW_ANIMFRAMES);
+		float xpos = Bezier(time, event_data->hud.arrow_prevpos, event_data->hud.arrow_nextpos);
+
+		// update position
+		JOBJ *arrow_jobj;
+		JOBJ_GetChild(hud_jobj, &arrow_jobj, WDJOBJ_ARROW, -1); // get timing bar jobj
+		arrow_jobj->trans.X = xpos;
+		JOBJ_SetMtxDirtySub(arrow_jobj);
+	}
+}
+
+
+
+
+
 void Wavedash_HUDCamThink(GOBJ *gobj)
 {
     // if HUD enabled and not paused
@@ -631,6 +995,40 @@ GOBJ *Target_Spawn(WavedashData *event_data, FighterData *hmn_data)
         return 0;
     }
 }
+
+bool IsTargetSatisfied_DashDance(WavedashData *event_data, TargetData *target_data, FighterData *hmn_data, Vec3 pos)
+{
+	Vec3 *ft_pos = &hmn_data->phys.pos;
+	if (hmn_data->state_id == ASID_DASH &&
+		(ft_pos->X > (pos.X + target_data->left)) &&
+		(ft_pos->X < (pos.X + target_data->right)) &&
+		(ft_pos->Y >(pos.Y + -1)) &&
+		(ft_pos->Y < (pos.Y + 1)))
+	{
+		return true;
+	}
+
+	return false;
+}
+
+bool IsTargetSatisfied(WavedashData *event_data, TargetData *target_data, FighterData *hmn_data, Vec3 pos)
+{
+	return IsTargetSatisfied_DashDance(event_data, target_data, hmn_data, pos);
+
+	Vec3 *ft_pos = &hmn_data->phys.pos;
+	if ((hmn_data->phys.air_state == 0) &&
+		((event_data->since_wavedash > 0) && (event_data->since_wavedash < 255) && (fabs(hmn_data->phys.self_vel.X) < 0.5)) && // check if a wavedash
+		(ft_pos->X > (pos.X + target_data->left)) &&
+		(ft_pos->X < (pos.X + target_data->right)) &&
+		(ft_pos->Y > (pos.Y + -1)) &&
+		(ft_pos->Y < (pos.Y + 1)))
+	{
+		return true;
+	}
+
+	return false;
+}
+
 void Target_Think(GOBJ *target_gobj)
 {
     JOBJ *target_jobj = target_gobj->hsd_object;
@@ -691,15 +1089,18 @@ void Target_Think(GOBJ *target_gobj)
         // check for collision
         FighterData *hmn_data = Fighter_GetGObj(0)->userdata;
 
-        Vec3 *ft_pos = &hmn_data->phys.pos;
-        if ((hmn_data->phys.air_state == 0) &&
-            ((event_data->since_wavedash > 0) && (event_data->since_wavedash < 255) && (fabs(hmn_data->phys.self_vel.X) < 0.5)) && // check if a wavedash
-            (ft_pos->X > (pos.X + target_data->left)) &&
-            (ft_pos->X < (pos.X + target_data->right)) &&
-            (ft_pos->Y > (pos.Y + -1)) &&
-            (ft_pos->Y < (pos.Y + 1)))
-        {
+       
 
+
+		if(IsTargetSatisfied( event_data, target_data, hmn_data, pos))
+        {
+			JOBJ *hud_jobj = event_data->hud.gobj->hsd_object;
+
+			event_data->dash_dances_succeeded++;
+			void *mat_anim = event_data->assets->hudmatanim[0];
+			JOBJ_RemoveAnimAll(hud_jobj);
+			JOBJ_AddAnimAll(hud_jobj, 0, mat_anim, 0);
+			JOBJ_ReqAnimAll(hud_jobj, 0);
             // sfx
             SFX_Play(173);
 
@@ -756,7 +1157,6 @@ float Target_GetWdashDistance(FighterData *hmn_data, float mag)
         float friction = hmn_data->attr.ground_friction;
         if (mag > hmn_data->attr.walk_maximum_velocity) // double friction if speed > walk max speed
             friction *= ftcommon->friction_mult;
-
         // apply it
         mag -= friction;
 
@@ -766,6 +1166,8 @@ float Target_GetWdashDistance(FighterData *hmn_data, float mag)
 
         distance += mag;
     }
+
+	distance = 80;
 
     return distance;
 }

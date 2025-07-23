@@ -7261,6 +7261,8 @@ void Event_Init(GOBJ *gobj)
 
 		Record_MemcardLoad(0, loaded_workout->exercise_indexes[workIndex]);
 
+		wavedashData->dash_dance_event_success = 0;
+
 		LabOptions_Record[OPTREC_SAVE_LOAD] = Record_Load;
 
 		// When we load rwing savestates, we don't want infinite shields by default. This would cause desyncs galore.
@@ -7282,6 +7284,30 @@ void Event_Init(GOBJ *gobj)
     OSReport("HMN: %x\tCPU: %x\n", (u32)hmn_data, (u32)cpu_data);
 }
 
+void Next_State()
+{
+	LoadedWorkoutInfo *loaded_workout = *workout_info;
+	Record_MemcardLoad(0, loaded_workout->exercise_indexes[workIndex]);
+
+	LabOptions_Record[OPTREC_SAVE_LOAD] = Record_Load;
+
+	wavedashData->dash_dance_event_success = 0;
+	wavedashData->dash_dances_succeeded = 0;
+	wavedashData->is_dash_dancing = 0;
+
+
+	// When we load rwing savestates, we don't want infinite shields by default. This would cause desyncs galore.
+	LabOptions_CPU[OPTCPU_SHIELD].val = CPUINFSHIELD_OFF;
+
+	++workIndex;
+
+	if (workIndex >= loaded_workout->workout.exercise_count)
+	{
+		workIndex = 0;
+	}
+
+	currStateFramesRemaining = 0;//DEFAULT_WORK_DURATION;
+}
 // Update Function
 void Event_Update()
 {
@@ -7328,6 +7354,10 @@ void Event_Update()
         HSD_SetSpeedEasy(1.0);
     }
 
+	if (wavedashData->dash_dance_event_success == 1)
+	{
+		Next_State();
+	}
 	
     int pause_pressed = 0;
 	for (int i = 0; i < 6; i++)
@@ -7355,23 +7385,8 @@ void Event_Update()
 				{
 					//Test_Me();
 					//u8 *test = *workout_states_arr_ptr;
-
-					LoadedWorkoutInfo *loaded_workout = *workout_info;
-					Record_MemcardLoad(0, loaded_workout->exercise_indexes[workIndex]);
-
-					LabOptions_Record[OPTREC_SAVE_LOAD] = Record_Load;
-
-					// When we load rwing savestates, we don't want infinite shields by default. This would cause desyncs galore.
-					LabOptions_CPU[OPTCPU_SHIELD].val = CPUINFSHIELD_OFF;
-
-					++workIndex;
-
-					if (workIndex >= loaded_workout->workout.exercise_count)
-					{
-						workIndex = 0;
-					}
-
-					currStateFramesRemaining = 0;//DEFAULT_WORK_DURATION;
+					Next_State();
+					
 				}
 
 
@@ -7733,7 +7748,10 @@ void Task_Think()
 {
 	GOBJ *hmn = Fighter_GetGObj(0);
 	FighterData *hmn_data = hmn->userdata;
-	Wavedash_Think(wavedashData, hmn_data);
+	
+	//Wavedash_Think(wavedashData, hmn_data);
+	Dash_Dance_Think(wavedashData, hmn_data);
+	//JCGrab_Think(wavedashData, hmn_data);
 }
 
 // Think Function
