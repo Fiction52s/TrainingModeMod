@@ -1047,6 +1047,9 @@ void Dash_Forward_Out_Of_Crouch_Think(WavedashData *event_data, FighterData *hmn
 
 }
 
+
+//--DASH SHIELD STOP
+
 void Dash_Shield_Stop_Think(WavedashData *event_data, FighterData *hmn_data)
 {
 	if (hmn_data->state_id == ASID_DASH && hmn_data->TM.state_frame == 0 && event_data->task_started == 0)
@@ -1095,6 +1098,73 @@ bool Dash_Shield_Stop_IsTargetSatisfied(WavedashData *event_data, TargetData *ta
 {
 	Vec3 *ft_pos = &hmn_data->phys.pos;
 	if (event_data->task_started && hmn_data->state_id == ASID_GUARDREFLECT || hmn_data->state_id == ASID_GUARD &&
+		(ft_pos->X > (pos.X + target_data->left)) &&
+		(ft_pos->X < (pos.X + target_data->right)) &&
+		(ft_pos->Y >(pos.Y + -1)) &&
+		(ft_pos->Y < (pos.Y + 1)))
+	{
+		return true;
+	}
+
+	return false;
+}
+
+
+
+void Run_Shield_Stop_Think(WavedashData *event_data, FighterData *hmn_data)
+{
+	if (hmn_data->state_id == ASID_DASH && hmn_data->TM.state_frame == 0 && event_data->task_started == 0)
+	{
+		event_data->task_started = 1;
+
+		// save line and position
+		event_data->restore.pos.X = hmn_data->phys.pos.X;
+		event_data->restore.pos.Y = hmn_data->phys.pos.Y;
+		event_data->restore.line_index = hmn_data->coll_data.ground_index;
+	}
+
+	if (event_data->task_started == 1)
+	{
+		if (hmn_data->state_id != ASID_DASH 
+			&& hmn_data->state_id != ASID_TURN 
+			&& hmn_data->state_id != ASID_GUARDREFLECT 
+			&& hmn_data->state_id != ASID_GUARD 
+			&& hmn_data->state_id != ASID_RUN)
+		{
+			Task_Fail_And_Reset(event_data);
+		}
+		/*else if (hmn_data->state_id != ASID_DASH && hmn_data->state_id != ASID_RUN && !(hmn_data->state_id == ASID_RUNBRAKE && hmn_data->TM.state_frame == 0))
+		{
+		Task_Fail_And_Reset(event_data);
+		}
+		else if (hmn_data->state_id == ASID_RUN && hmn_data->TM.state_frame > 2)
+		{
+		Task_Fail_And_Reset(event_data);
+		}*/
+	}
+
+	JOBJ *hud_jobj = event_data->hud.gobj->hsd_object;
+	Text_SetText(event_data->hud.text_succession, 0, "%u / %u", event_data->success_count, event_data->task->max_success);
+
+	// update target
+	Target_Manager(event_data, hmn_data);
+
+	// run tip logic
+	Tips_Think(event_data, hmn_data);
+
+	// update HUD anim
+	JOBJ_AnimAll(hud_jobj);
+
+	Update_Arrow(event_data);
+
+}
+
+bool Run_Shield_Stop_IsTargetSatisfied(WavedashData *event_data, TargetData *target_data, FighterData *hmn_data, Vec3 pos)
+{
+	Vec3 *ft_pos = &hmn_data->phys.pos;
+	if (event_data->task_started 
+		&& ((hmn_data->state_id == ASID_GUARDREFLECT && hmn_data->TM.state_prev[0] == ASID_RUN ) 
+		|| (hmn_data->state_id == ASID_GUARD && hmn_data->TM.state_prev[1] == ASID_RUN ) ) &&
 		(ft_pos->X > (pos.X + target_data->left)) &&
 		(ft_pos->X < (pos.X + target_data->right)) &&
 		(ft_pos->Y >(pos.Y + -1)) &&

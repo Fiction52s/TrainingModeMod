@@ -155,3 +155,6 @@ void Dash_Forward_Out_Of_Crouch_Think(WavedashData *event_data, FighterData *hmn
 void Dash_Shield_Stop_Think(WavedashData *event_data, FighterData *hmn_data);
 bool Dash_Shield_Stop_IsTargetSatisfied(WavedashData *event_data, TargetData *target_data, FighterData *hmn_data, Vec3 pos);
 
+void Run_Shield_Stop_Think(WavedashData *event_data, FighterData *hmn_data);
+bool Run_Shield_Stop_IsTargetSatisfied(WavedashData *event_data, TargetData *target_data, FighterData *hmn_data, Vec3 pos);
+
