@@ -27,8 +27,11 @@ typedef struct TargetData TargetData;
 
 typedef struct TaskData
 {
-	u8 is_target_mode_on;
 	u8 max_success;
+	u8 is_target_mode_on;
+	float target_scale;
+	u16 target_min_distance;
+	u16 target_max_distance;
 	void(*Task_Init)(WavedashData *event_data);
 	void(*Task_Think)(WavedashData *event_data, FighterData *hmn_data);
 	bool(*Task_IsTargetSatisfied)(WavedashData *event_data, TargetData *target_data, FighterData *hmn_data, Vec3 pos);
@@ -148,4 +151,7 @@ bool Dash_Dance_IsTargetSatisfied(WavedashData *event_data, TargetData *target_d
 void Crouch_Out_Of_Run_Think(WavedashData *event_data, FighterData *hmn_data);
 
 void Dash_Forward_Out_Of_Crouch_Think(WavedashData *event_data, FighterData *hmn_data);
+
+void Dash_Shield_Stop_Think(WavedashData *event_data, FighterData *hmn_data);
+bool Dash_Shield_Stop_IsTargetSatisfied(WavedashData *event_data, TargetData *target_data, FighterData *hmn_data, Vec3 pos);
 

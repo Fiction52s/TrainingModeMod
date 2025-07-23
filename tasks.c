@@ -523,18 +523,21 @@ void Target_Init(WavedashData *event_data, FighterData *hmn_data)
     float mag;
 
     // determine best wavedash distance (not taking into account friction doubling)
-    mag = ftcommon->escapeair_vel * cos(atan2(-0.2875, 0.9500));
-    float wd_maxdstn = Target_GetWdashDistance(hmn_data, mag);
-    OSReport("%s wd_maxdstn: %.2f\n", Fighter_GetName(Fighter_GetExternalID(hmn_data->ply)), wd_maxdstn);
-    event_data->wd_maxdstn = wd_maxdstn;
+    //mag = ftcommon->escapeair_vel * cos(atan2(-0.2875, 0.9500));
+    //float wd_maxdstn = Target_GetWdashDistance(hmn_data, mag);
+    //OSReport("%s wd_maxdstn: %.2f\n", Fighter_GetName(Fighter_GetExternalID(hmn_data->ply)), wd_maxdstn);
+    //event_data->wd_maxdstn = wd_maxdstn;
 
     // determine scale based on wd distance
-    float dist = event_data->wd_maxdstn;
+   /* float dist = event_data->wd_maxdstn;
     if (dist < TRGTSCL_DISTMIN)
         dist = TRGTSCL_DISTMIN;
     else if (dist > TRGTSCL_DISTMAX)
-        dist = TRGTSCL_DISTMAX;
-    event_data->target.scale = (((dist - TRGTSCL_DISTMIN) / (TRGTSCL_DISTMAX - TRGTSCL_DISTMIN)) * (TRGTSCL_SCALEMAX - TRGTSCL_SCALEMIN)) + TRGTSCL_SCALEMIN;
+        dist = TRGTSCL_DISTMAX;*/
+
+	
+	event_data->target.scale = event_data->task->target_scale;
+    //(((dist - TRGTSCL_DISTMIN) / (TRGTSCL_DISTMAX - TRGTSCL_DISTMIN)) * (TRGTSCL_SCALEMAX - TRGTSCL_SCALEMIN)) + TRGTSCL_SCALEMIN;
 
     // get width of the target
     JOBJ *target = JOBJ_LoadJoint(event_data->assets->target_jobj); // create dummy
@@ -599,8 +602,8 @@ GOBJ *Target_Spawn(WavedashData *event_data, FighterData *hmn_data)
     Vec3 ray_angle;
     Vec3 ray_pos;
     int ray_index;
-    float max = (event_data->wd_maxdstn * TRGT_RANGEMAX);
-    float min = (event_data->wd_maxdstn * TRGT_RANGEMIN);
+    float max = event_data->task->target_max_distance;
+	float min = event_data->task->target_min_distance;
 
     // ensure min exists
     int min_exists = 0;
@@ -1042,4 +1045,63 @@ void Dash_Forward_Out_Of_Crouch_Think(WavedashData *event_data, FighterData *hmn
 
 	Update_Arrow(event_data);
 
+}
+
+void Dash_Shield_Stop_Think(WavedashData *event_data, FighterData *hmn_data)
+{
+	if (hmn_data->state_id == ASID_DASH && hmn_data->TM.state_frame == 0 && event_data->task_started == 0)
+	{
+		event_data->task_started = 1;
+
+		// save line and position
+		event_data->restore.pos.X = hmn_data->phys.pos.X;
+		event_data->restore.pos.Y = hmn_data->phys.pos.Y;
+		event_data->restore.line_index = hmn_data->coll_data.ground_index;
+	}
+
+	if (event_data->task_started == 1)
+	{
+		if (hmn_data->state_id != ASID_DASH && hmn_data->state_id != ASID_TURN && hmn_data->state_id != ASID_GUARDREFLECT && hmn_data->state_id != ASID_GUARD)
+		{
+			Task_Fail_And_Reset(event_data);
+		}
+		/*else if (hmn_data->state_id != ASID_DASH && hmn_data->state_id != ASID_RUN && !(hmn_data->state_id == ASID_RUNBRAKE && hmn_data->TM.state_frame == 0))
+		{
+		Task_Fail_And_Reset(event_data);
+		}
+		else if (hmn_data->state_id == ASID_RUN && hmn_data->TM.state_frame > 2)
+		{
+		Task_Fail_And_Reset(event_data);
+		}*/
+	}
+
+	JOBJ *hud_jobj = event_data->hud.gobj->hsd_object;
+	Text_SetText(event_data->hud.text_succession, 0, "%u / %u", event_data->success_count, event_data->task->max_success);
+
+	// update target
+	Target_Manager(event_data, hmn_data);
+
+	// run tip logic
+	Tips_Think(event_data, hmn_data);
+
+	// update HUD anim
+	JOBJ_AnimAll(hud_jobj);
+
+	Update_Arrow(event_data);
+
+}
+
+bool Dash_Shield_Stop_IsTargetSatisfied(WavedashData *event_data, TargetData *target_data, FighterData *hmn_data, Vec3 pos)
+{
+	Vec3 *ft_pos = &hmn_data->phys.pos;
+	if (event_data->task_started && hmn_data->state_id == ASID_GUARDREFLECT || hmn_data->state_id == ASID_GUARD &&
+		(ft_pos->X > (pos.X + target_data->left)) &&
+		(ft_pos->X < (pos.X + target_data->right)) &&
+		(ft_pos->Y >(pos.Y + -1)) &&
+		(ft_pos->Y < (pos.Y + 1)))
+	{
+		return true;
+	}
+
+	return false;
 }

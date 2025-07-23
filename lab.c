@@ -18,8 +18,11 @@ typedef enum Task
 
 TaskData dash_dance_data = {
 	// Event Name
-	.is_target_mode_on = true,
 	.max_success = 10,
+	.is_target_mode_on = true,
+	.target_scale = 1.f,
+	.target_min_distance = 20,
+	.target_min_distance = 80,
 	.Task_Init = 0,//Dash_Dance_Init,
 	.Task_Think = Dash_Dance_Think,
 	.Task_IsTargetSatisfied = Dash_Dance_IsTargetSatisfied,
@@ -27,8 +30,11 @@ TaskData dash_dance_data = {
 
 TaskData crouch_out_of_run_data = {
 	// Event Name
-	.is_target_mode_on = false,
 	.max_success = 10,
+	.is_target_mode_on = false,
+	.target_scale = 1.f,
+	.target_min_distance = 0,
+	.target_min_distance = 0,
 	.Task_Init = 0,//Crouch_Out_Of_Run_Init,
 	.Task_Think = Crouch_Out_Of_Run_Think,
 	.Task_IsTargetSatisfied = 0
@@ -36,11 +42,26 @@ TaskData crouch_out_of_run_data = {
 
 TaskData dash_forward_out_of_crouch_data = {
 	// Event Name
-	.is_target_mode_on = false,
 	.max_success = 10,
+	.is_target_mode_on = false,
+	.target_scale = 1.f,
+	.target_min_distance = 0,
+	.target_min_distance = 0,
 	.Task_Init = 0,
 	.Task_Think = Dash_Forward_Out_Of_Crouch_Think,
 	.Task_IsTargetSatisfied = 0
+};
+
+TaskData dash_shield_stop_data = {
+	// Event Name
+	.max_success = 10,
+	.is_target_mode_on = true,
+	.target_scale = 1.f,
+	.target_min_distance = 30,
+	.target_min_distance = 30,
+	.Task_Init = 0,
+	.Task_Think = Dash_Shield_Stop_Think,
+	.Task_IsTargetSatisfied = Dash_Shield_Stop_IsTargetSatisfied
 };
 
 static WavedashData *wavedashData;
@@ -57,6 +78,9 @@ void SetTask(int task)
 		break;
 	case TASK_DASH_FORWARD_OUT_OF_CROUCH:
 		wavedashData->task = &dash_forward_out_of_crouch_data;
+		break;
+	case TASK_DASH_SHIELD_STOP:
+		wavedashData->task = &dash_shield_stop_data;
 		break;
 	default:
 		OSReport("attemping to set task as %i but data is not assigned!!\n", task);
@@ -7180,7 +7204,7 @@ void Event_Init(GOBJ *gobj)
 
 	//wavedashData->task->is = true;
 
-	SetTask(TASK_DASH_FORWARD_OUT_OF_CROUCH);//TASK_CROUCH_OUT_OF_RUN);
+	SetTask(TASK_DASH_SHIELD_STOP);//TASK_CROUCH_OUT_OF_RUN);
 
 	int page = stc_memcard->TM_EventPage;
 	int eventID = stc_memcard->EventBackup.event;
