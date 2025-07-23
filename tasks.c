@@ -63,6 +63,7 @@ static EventMenu WdMenu_Main = {
     .options = &WdOptions_Main,
 };
 
+
 // Init Function
 void Old_Event_Init(GOBJ *gobj)
 {
@@ -337,6 +338,8 @@ void Wavedash_Think(WavedashData *event_data, FighterData *hmn_data)
 
 void Reset_Task(WavedashData *event_data)
 {
+	event_data->success_count = 0;
+	event_data->event_success = 0;
 	// reset variables
 	event_data->timer = -1;
 	event_data->is_airdodge = 0;
@@ -386,7 +389,7 @@ void Reset_Task(WavedashData *event_data)
 	int successful = event_data->wd_succeeded;
 
 	//float succession = event_data->dash_dances_succeeded;
-	Text_SetText(event_data->hud.text_succession, 0, "%u / 10", event_data->dash_dances_succeeded);
+	Text_SetText(event_data->hud.text_succession, 0, "%u / 10", event_data->success_count);
 
 	//float succession = ((float)event_data->wd_succeeded / (float)event_data->wd_attempted) * 100.0;
 	//Text_SetText(event_data->hud.text_succession, 0, "%d (%.2f%)", successful, succession);
@@ -477,51 +480,7 @@ void Fail_Task(WavedashData *event_data)
 	}
 }
 
-void Dash_Dance_Think(WavedashData *event_data, FighterData *hmn_data)
-{
-	if (event_data->dash_dances_succeeded == 10)
-	{
-		event_data->dash_dance_event_success = 1;
-		return;
-	}
 
-	if (hmn_data->state_id == ASID_DASH && event_data->is_dash_dancing == 0)
-	{
-		event_data->is_dash_dancing = 1;
-		event_data->dash_dances_succeeded = 0;
-		// save line and position
-		event_data->restore.pos.X = hmn_data->phys.pos.X;
-		event_data->restore.pos.Y = hmn_data->phys.pos.Y;
-		event_data->restore.line_index = hmn_data->coll_data.ground_index;
-	}
-	
-	if (event_data->is_dash_dancing == 1)
-	{
-		if (hmn_data->state_id != ASID_DASH && hmn_data->state_id != ASID_TURN)
-		{
-			Fail_Task(event_data);
-			Reset_Task(event_data);
-			event_data->is_dash_dancing = 0;
-			//return;
-		}
-	}
-
-	JOBJ *hud_jobj = event_data->hud.gobj->hsd_object;
-
-	Text_SetText(event_data->hud.text_succession, 0, "%u / 10", event_data->dash_dances_succeeded);
-
-	// update target
-	Target_Manager(event_data, hmn_data);
-
-	// run tip logic
-	Tips_Think(event_data, hmn_data);
-
-	// update HUD anim
-	JOBJ_AnimAll(hud_jobj);
-
-	Update_Arrow(event_data);
-
-}
 
 
 void JCGrab_Think(WavedashData *event_data, FighterData *hmn_data)
@@ -807,6 +766,13 @@ void JCGrab_Think(WavedashData *event_data, FighterData *hmn_data)
 
 
 
+//void Task_TargetSuccess(WavedashData *event_data, TargetData *target_data, FighterData *hmn_data, Vec3 pos)
+//{
+//
+//}
+
+
+
 
 
 void Wavedash_HUDCamThink(GOBJ *gobj)
@@ -862,7 +828,7 @@ void Target_Init(WavedashData *event_data, FighterData *hmn_data)
 void Target_Manager(WavedashData *event_data, FighterData *hmn_data)
 {
     GOBJ *target_gobj = event_data->target.gobj;
-    if (event_data->is_target_mode_on)//WdOptions_Main[OPT_TARGET].val)
+    if (event_data->task->is_target_mode_on)//WdOptions_Main[OPT_TARGET].val)
     { // on
         // if not spawned, spawn
         if (target_gobj == 0)
@@ -1029,6 +995,18 @@ bool IsTargetSatisfied(WavedashData *event_data, TargetData *target_data, Fighte
 	return false;
 }
 
+void Success(WavedashData *event_data)
+{
+	JOBJ *hud_jobj = event_data->hud.gobj->hsd_object;
+	event_data->success_count++;
+	void *mat_anim = event_data->assets->hudmatanim[0];
+	JOBJ_RemoveAnimAll(hud_jobj);
+	JOBJ_AddAnimAll(hud_jobj, 0, mat_anim, 0);
+	JOBJ_ReqAnimAll(hud_jobj, 0);
+	// sfx
+	SFX_Play(173);
+}
+
 void Target_Think(GOBJ *target_gobj)
 {
     JOBJ *target_jobj = target_gobj->hsd_object;
@@ -1089,23 +1067,15 @@ void Target_Think(GOBJ *target_gobj)
         // check for collision
         FighterData *hmn_data = Fighter_GetGObj(0)->userdata;
 
-       
+		if (event_data->task->Task_IsTargetSatisfied != 0)
+		{
+			if (event_data->task->Task_IsTargetSatisfied(event_data, target_data, hmn_data, pos))
+			{
+				Success(event_data);
 
-
-		if(IsTargetSatisfied( event_data, target_data, hmn_data, pos))
-        {
-			JOBJ *hud_jobj = event_data->hud.gobj->hsd_object;
-
-			event_data->dash_dances_succeeded++;
-			void *mat_anim = event_data->assets->hudmatanim[0];
-			JOBJ_RemoveAnimAll(hud_jobj);
-			JOBJ_AddAnimAll(hud_jobj, 0, mat_anim, 0);
-			JOBJ_ReqAnimAll(hud_jobj, 0);
-            // sfx
-            SFX_Play(173);
-
-            Target_ChangeState(target_gobj, TRGSTATE_DESPAWN);
-        }
+				Target_ChangeState(target_gobj, TRGSTATE_DESPAWN);
+			}
+		}
 
         break;
     }
@@ -1220,3 +1190,134 @@ Tips_Think(WavedashData *event_data, FighterData *hmn_data)
 
 // Initial Menu
 //EventMenu *Event_Menu = &WdMenu_Main;
+
+
+
+
+
+
+//--DASH DANCE
+
+void Dash_Dance_Init(WavedashData *event_data)
+{
+	event_data->dash_dance.is_dashing = 0;
+}
+
+void Dash_Dance_Think(WavedashData *event_data, FighterData *hmn_data)
+{
+	if (hmn_data->state_id == ASID_DASH && event_data->dash_dance.is_dashing == 0)
+	{
+		event_data->dash_dance.is_dashing = 1;
+		event_data->success_count = 0;
+		// save line and position
+		event_data->restore.pos.X = hmn_data->phys.pos.X;
+		event_data->restore.pos.Y = hmn_data->phys.pos.Y;
+		event_data->restore.line_index = hmn_data->coll_data.ground_index;
+	}
+
+	if (event_data->dash_dance.is_dashing == 1)
+	{
+		if (hmn_data->state_id != ASID_DASH && hmn_data->state_id != ASID_TURN)
+		{
+			Fail_Task(event_data);
+			Reset_Task(event_data);
+			event_data->dash_dance.is_dashing = 0;
+			//return;
+		}
+	}
+
+	JOBJ *hud_jobj = event_data->hud.gobj->hsd_object;
+
+	Text_SetText(event_data->hud.text_succession, 0, "%u / %u", event_data->success_count, event_data->task->max_success);
+
+	// update target
+	Target_Manager(event_data, hmn_data);
+
+	// run tip logic
+	Tips_Think(event_data, hmn_data);
+
+	// update HUD anim
+	JOBJ_AnimAll(hud_jobj);
+
+	Update_Arrow(event_data);
+
+}
+
+bool Dash_Dance_IsTargetSatisfied(WavedashData *event_data, TargetData *target_data, FighterData *hmn_data, Vec3 pos)
+{
+	Vec3 *ft_pos = &hmn_data->phys.pos;
+	if (hmn_data->state_id == ASID_DASH &&
+		(ft_pos->X > (pos.X + target_data->left)) &&
+		(ft_pos->X < (pos.X + target_data->right)) &&
+		(ft_pos->Y >(pos.Y + -1)) &&
+		(ft_pos->Y < (pos.Y + 1)))
+	{
+		return true;
+	}
+
+	return false;
+}
+
+
+
+//--
+
+void Crouch_Out_Of_Run_Init(WavedashData *event_data)
+{
+	event_data->crouch_out_of_run.is_running = 0;
+}
+
+void Crouch_Out_Of_Run_Think(WavedashData *event_data, FighterData *hmn_data)
+{
+	if (hmn_data->state_id == ASID_DASH && event_data->crouch_out_of_run.is_running == 0)
+	{
+		event_data->crouch_out_of_run.is_running = 1;
+		//event_data->success_count = 0;
+		// save line and position
+		event_data->restore.pos.X = hmn_data->phys.pos.X;
+		event_data->restore.pos.Y = hmn_data->phys.pos.Y;
+		event_data->restore.line_index = hmn_data->coll_data.ground_index;
+	}
+
+	if (event_data->crouch_out_of_run.is_running == 1)
+	{
+		if (hmn_data->state_id == ASID_SQUAT)
+		{
+			Success(event_data);
+			event_data->crouch_out_of_run.is_running = 0;
+		}
+		else if (hmn_data->state_id == ASID_DASH && hmn_data->TM.state_frame > 11)
+		{
+			Fail_Task(event_data);
+			Reset_Task(event_data);
+			event_data->crouch_out_of_run.is_running = 0;
+		}
+		else if (hmn_data->state_id != ASID_DASH && hmn_data->state_id != ASID_RUN && !(hmn_data->state_id == ASID_RUNBRAKE && hmn_data->TM.state_frame == 0))
+		{
+			Fail_Task(event_data);
+			Reset_Task(event_data);
+			event_data->crouch_out_of_run.is_running = 0;
+		}
+		else if (hmn_data->state_id == ASID_RUN && hmn_data->TM.state_frame > 2)
+		{
+			Fail_Task(event_data);
+			Reset_Task(event_data);
+			event_data->crouch_out_of_run.is_running = 0;
+		}
+	}
+
+	JOBJ *hud_jobj = event_data->hud.gobj->hsd_object;
+	Text_SetText(event_data->hud.text_succession, 0, "%u / %u", event_data->success_count, event_data->task->max_success);
+
+	// update target
+	Target_Manager(event_data, hmn_data);
+
+	// run tip logic
+	Tips_Think(event_data, hmn_data);
+
+	// update HUD anim
+	JOBJ_AnimAll(hud_jobj);
+
+	Update_Arrow(event_data);
+
+}

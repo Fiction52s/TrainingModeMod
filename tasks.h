@@ -23,6 +23,18 @@
 typedef struct WavedashData WavedashData;
 typedef struct WavedashAssets WavedashAssets;
 typedef struct TargetData TargetData;
+//typedef struct TaskData TaskData;
+
+typedef struct TaskData
+{
+	u8 is_target_mode_on;
+	u8 max_success;
+	void(*Task_Init)(WavedashData *event_data);
+	void(*Task_Think)(WavedashData *event_data, FighterData *hmn_data);
+	bool(*Task_IsTargetSatisfied)(WavedashData *event_data, TargetData *target_data, FighterData *hmn_data, Vec3 pos);
+	//void(*Task_TargetSuccess)(WavedashData *event_data, TargetData *target_data, FighterData *hmn_data, Vec3 pos);
+	//void(*Task_Complete)(WavedashData *event_data);
+} TaskData;
 
 struct WavedashData
 {
@@ -61,12 +73,25 @@ struct WavedashData
 	float wd_angle;
 	int wd_attempted;
 	int wd_succeeded;
-	u8 is_target_mode_on;
+	
+	TaskData *task;
+	
+	u8 success_count;
+	u8 event_success;
+	
+	struct
+	{
+		u8 is_dashing;
+	} dash_dance;
 
+	struct
+	{
+		u8 success_count;
+		u8 is_running;
+		u8 event_success;
+	} crouch_out_of_run;
 
-	u8 is_dash_dancing;
-	u8 dash_dances_succeeded;
-	u8 dash_dance_event_success;
+	u8 is_running;
 
 	struct
 	{
@@ -111,7 +136,14 @@ void Target_Think(GOBJ *target_gobj);
 void Wavedash_HUDCamThink(GOBJ *gobj);
 void Event_Exit();
 void Wavedash_Init(WavedashData *event_data);
-void Wavedash_Think(WavedashData *event_data, FighterData *hmn_data);\
+void Wavedash_Think(WavedashData *event_data, FighterData *hmn_data);
+
+void Dash_Dance_Init(WavedashData *event_data);
 void Dash_Dance_Think(WavedashData *event_data, FighterData *hmn_data);
+bool Dash_Dance_IsTargetSatisfied(WavedashData *event_data, TargetData *target_data, FighterData *hmn_data, Vec3 pos);
+
+void Crouch_Out_Of_Run_Init(WavedashData *event_data);
+void Crouch_Out_Of_Run_Think(WavedashData *event_data, FighterData *hmn_data);
+
 void JCGrab_Think(WavedashData *event_data, FighterData *hmn_data);
 

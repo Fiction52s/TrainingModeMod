@@ -2,6 +2,23 @@
 
 #include <stddef.h>
 
+TaskData dash_dance_data = {
+	// Event Name
+	.is_target_mode_on = true,
+	.max_success = 10,
+	.Task_Init = Dash_Dance_Init,
+	.Task_Think = Dash_Dance_Think,
+	.Task_IsTargetSatisfied = Dash_Dance_IsTargetSatisfied,
+};
+
+TaskData crouch_out_of_run_data = {
+	// Event Name
+	.is_target_mode_on = false,
+	.max_success = 10,
+	.Task_Init = Crouch_Out_Of_Run_Init,
+	.Task_Think = Crouch_Out_Of_Run_Think,
+	.Task_IsTargetSatisfied = 0
+};
 
 int parse_workout_data(uint8_t *data, size_t length, WorkoutFile *out) {
 	size_t offset = 0;
@@ -136,6 +153,73 @@ const int DEFAULT_WORK_DURATION = 60 * 60 * 5;
 // There is no flag in the game that stores the lcancel state,
 // so we calculate it on the first frame of landing and store it here. 
 static bool did_player_miss_lcancel[2] = {false, false};
+
+
+
+
+void First_State()
+{
+	LoadedWorkoutInfo *loaded_workout = *workout_info;
+	if (loaded_workout->workout.exercise_count > 0)
+	{
+		//u8 *test = *workout_info->exercise_indexes;
+
+		OSReport("SUCCESS %i\n", loaded_workout->workout.exercise_count);
+
+
+		Record_MemcardLoad(0, loaded_workout->exercise_indexes[workIndex]);
+
+		wavedashData->event_success = 0;
+		wavedashData->success_count = 0;
+		wavedashData->task->Task_Init(wavedashData);
+
+		LabOptions_Record[OPTREC_SAVE_LOAD] = Record_Load;
+
+		// When we load rwing savestates, we don't want infinite shields by default. This would cause desyncs galore.
+		LabOptions_CPU[OPTCPU_SHIELD].val = CPUINFSHIELD_OFF;
+
+		++workIndex;
+
+		if (workIndex >= loaded_workout->workout.exercise_count)
+		{
+			workIndex = 0;
+		}
+	}
+	else
+	{
+		OSReport("FAILFAILFAIL\n");
+	}
+}
+
+void Next_State()
+{
+	LoadedWorkoutInfo *loaded_workout = *workout_info;
+	Record_MemcardLoad(0, loaded_workout->exercise_indexes[workIndex]);
+
+	LabOptions_Record[OPTREC_SAVE_LOAD] = Record_Load;
+
+	wavedashData->event_success = 0;
+	wavedashData->success_count = 0;
+	wavedashData->task->Task_Init(wavedashData);
+
+
+	// When we load rwing savestates, we don't want infinite shields by default. This would cause desyncs galore.
+	LabOptions_CPU[OPTCPU_SHIELD].val = CPUINFSHIELD_OFF;
+
+	++workIndex;
+
+	if (workIndex >= loaded_workout->workout.exercise_count)
+	{
+		workIndex = 0;
+	}
+
+	currStateFramesRemaining = 0;//DEFAULT_WORK_DURATION;
+}
+
+
+
+
+
 
 // Menu Callbacks
 
@@ -7050,7 +7134,9 @@ void Event_Init(GOBJ *gobj)
     FighterData *cpu_data = cpu->userdata;
     GObj_AddProc(gobj, Event_PostThink, 20);
 
-	wavedashData->is_target_mode_on = true;
+	//wavedashData->task->is = true;
+
+	wavedashData->task = &crouch_out_of_run_data;//&dash_dance_data;
 
 	int page = stc_memcard->TM_EventPage;
 	int eventID = stc_memcard->EventBackup.event;
@@ -7250,64 +7336,12 @@ void Event_Init(GOBJ *gobj)
     hmn_data->team = 0;
     cpu_data->team = 1;
 
-	LoadedWorkoutInfo *loaded_workout = *workout_info;
-
-	if(loaded_workout->workout.exercise_count > 0)
-	{
-		//u8 *test = *workout_info->exercise_indexes;
-
-		OSReport("SUCCESS %i\n", loaded_workout->workout.exercise_count);
-
-
-		Record_MemcardLoad(0, loaded_workout->exercise_indexes[workIndex]);
-
-		wavedashData->dash_dance_event_success = 0;
-
-		LabOptions_Record[OPTREC_SAVE_LOAD] = Record_Load;
-
-		// When we load rwing savestates, we don't want infinite shields by default. This would cause desyncs galore.
-		LabOptions_CPU[OPTCPU_SHIELD].val = CPUINFSHIELD_OFF;
-
-		++workIndex;
-
-		if (workIndex >= loaded_workout->workout.exercise_count)
-		{
-			workIndex = 0;
-		}
-	}
-	else
-	{
-		OSReport("FAILFAILFAIL\n");
-	}
+	First_State();
 
     // Aitch: VERY nice for debugging. Please don't remove.
     OSReport("HMN: %x\tCPU: %x\n", (u32)hmn_data, (u32)cpu_data);
 }
 
-void Next_State()
-{
-	LoadedWorkoutInfo *loaded_workout = *workout_info;
-	Record_MemcardLoad(0, loaded_workout->exercise_indexes[workIndex]);
-
-	LabOptions_Record[OPTREC_SAVE_LOAD] = Record_Load;
-
-	wavedashData->dash_dance_event_success = 0;
-	wavedashData->dash_dances_succeeded = 0;
-	wavedashData->is_dash_dancing = 0;
-
-
-	// When we load rwing savestates, we don't want infinite shields by default. This would cause desyncs galore.
-	LabOptions_CPU[OPTCPU_SHIELD].val = CPUINFSHIELD_OFF;
-
-	++workIndex;
-
-	if (workIndex >= loaded_workout->workout.exercise_count)
-	{
-		workIndex = 0;
-	}
-
-	currStateFramesRemaining = 0;//DEFAULT_WORK_DURATION;
-}
 // Update Function
 void Event_Update()
 {
@@ -7354,7 +7388,7 @@ void Event_Update()
         HSD_SetSpeedEasy(1.0);
     }
 
-	if (wavedashData->dash_dance_event_success == 1)
+	if (wavedashData->event_success == 1)
 	{
 		Next_State();
 	}
@@ -7749,8 +7783,15 @@ void Task_Think()
 	GOBJ *hmn = Fighter_GetGObj(0);
 	FighterData *hmn_data = hmn->userdata;
 	
+
+	if (wavedashData->success_count == wavedashData->task->max_success)
+	{
+		wavedashData->event_success = 1;
+		return;
+	}
 	//Wavedash_Think(wavedashData, hmn_data);
-	Dash_Dance_Think(wavedashData, hmn_data);
+	//Dash_Dance_Think(wavedashData, hmn_data);
+	wavedashData->task->Task_Think(wavedashData, hmn_data);
 	//JCGrab_Think(wavedashData, hmn_data);
 }
 
