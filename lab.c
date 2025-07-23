@@ -2,11 +2,25 @@
 
 #include <stddef.h>
 
+typedef enum Task
+{
+	TASK_DASH_DANCE,
+	TASK_CROUCH_OUT_OF_RUN,
+	TASK_DASH_FORWARD_OUT_OF_CROUCH,
+	TASK_DASH_SHIELD_STOP,
+	TASK_RUN_SHIELD_STOP,
+	TASK_SHORT_HOP,
+	TASK_SHORT_HOP_FAST_FALL,
+	TASK_SHORT_HOP_RETREATING_LASER,
+	TASK_SHORT_HOP_NEUTRAL_JUMP_OUT_OF_DASH,
+	TASK_FULL_HOP_NEUTRAL_JUMP_OUT_OF_DASH,
+};
+
 TaskData dash_dance_data = {
 	// Event Name
 	.is_target_mode_on = true,
 	.max_success = 10,
-	.Task_Init = Dash_Dance_Init,
+	.Task_Init = 0,//Dash_Dance_Init,
 	.Task_Think = Dash_Dance_Think,
 	.Task_IsTargetSatisfied = Dash_Dance_IsTargetSatisfied,
 };
@@ -15,10 +29,41 @@ TaskData crouch_out_of_run_data = {
 	// Event Name
 	.is_target_mode_on = false,
 	.max_success = 10,
-	.Task_Init = Crouch_Out_Of_Run_Init,
+	.Task_Init = 0,//Crouch_Out_Of_Run_Init,
 	.Task_Think = Crouch_Out_Of_Run_Think,
 	.Task_IsTargetSatisfied = 0
 };
+
+TaskData dash_forward_out_of_crouch_data = {
+	// Event Name
+	.is_target_mode_on = false,
+	.max_success = 10,
+	.Task_Init = 0,
+	.Task_Think = Dash_Forward_Out_Of_Crouch_Think,
+	.Task_IsTargetSatisfied = 0
+};
+
+static WavedashData *wavedashData;
+
+void SetTask(int task)
+{
+	switch (task)
+	{
+	case TASK_DASH_DANCE:
+		wavedashData->task = &dash_dance_data;
+		break;
+	case TASK_CROUCH_OUT_OF_RUN:
+		wavedashData->task = &crouch_out_of_run_data;
+		break;
+	case TASK_DASH_FORWARD_OUT_OF_CROUCH:
+		wavedashData->task = &dash_forward_out_of_crouch_data;
+		break;
+	default:
+		OSReport("attemping to set task as %i but data is not assigned!!\n", task);
+		assert(0);
+		break;
+	}
+}
 
 int parse_workout_data(uint8_t *data, size_t length, WorkoutFile *out) {
 	size_t offset = 0;
@@ -144,7 +189,7 @@ const int LOCKOUT_DURATION = 30;
 static float cpu_locked_percent = 0;
 static float hmn_locked_percent = 0;
 
-static WavedashData *wavedashData;
+
 
 const int DEFAULT_WORK_DURATION = 60 * 60 * 5;
 
@@ -155,7 +200,17 @@ const int DEFAULT_WORK_DURATION = 60 * 60 * 5;
 static bool did_player_miss_lcancel[2] = {false, false};
 
 
+void Task_Init()
+{
+	wavedashData->event_success = 0;
+	wavedashData->success_count = 0;
+	wavedashData->task_started = 0;
 
+	if (wavedashData->task->Task_Init != 0)
+	{
+		wavedashData->task->Task_Init(wavedashData);
+	}
+}
 
 void First_State()
 {
@@ -166,12 +221,9 @@ void First_State()
 
 		OSReport("SUCCESS %i\n", loaded_workout->workout.exercise_count);
 
-
 		Record_MemcardLoad(0, loaded_workout->exercise_indexes[workIndex]);
 
-		wavedashData->event_success = 0;
-		wavedashData->success_count = 0;
-		wavedashData->task->Task_Init(wavedashData);
+		Task_Init();
 
 		LabOptions_Record[OPTREC_SAVE_LOAD] = Record_Load;
 
@@ -198,10 +250,7 @@ void Next_State()
 
 	LabOptions_Record[OPTREC_SAVE_LOAD] = Record_Load;
 
-	wavedashData->event_success = 0;
-	wavedashData->success_count = 0;
-	wavedashData->task->Task_Init(wavedashData);
-
+	Task_Init();
 
 	// When we load rwing savestates, we don't want infinite shields by default. This would cause desyncs galore.
 	LabOptions_CPU[OPTCPU_SHIELD].val = CPUINFSHIELD_OFF;
@@ -215,11 +264,6 @@ void Next_State()
 
 	currStateFramesRemaining = 0;//DEFAULT_WORK_DURATION;
 }
-
-
-
-
-
 
 // Menu Callbacks
 
@@ -7136,7 +7180,7 @@ void Event_Init(GOBJ *gobj)
 
 	//wavedashData->task->is = true;
 
-	wavedashData->task = &crouch_out_of_run_data;//&dash_dance_data;
+	SetTask(TASK_DASH_FORWARD_OUT_OF_CROUCH);//TASK_CROUCH_OUT_OF_RUN);
 
 	int page = stc_memcard->TM_EventPage;
 	int eventID = stc_memcard->EventBackup.event;

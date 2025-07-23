@@ -78,20 +78,22 @@ struct WavedashData
 	
 	u8 success_count;
 	u8 event_success;
+	u8 task_started;
 	
-	struct
+	/*struct
 	{
-		u8 is_dashing;
+		u8 has_started;
 	} dash_dance;
 
 	struct
 	{
-		u8 success_count;
-		u8 is_running;
-		u8 event_success;
+		u8 has_started;
 	} crouch_out_of_run;
 
-	u8 is_running;
+	struct
+	{
+		u8 is_crouching;
+	} dash_forward_out_of_crouch;*/
 
 	struct
 	{
@@ -138,12 +140,12 @@ void Event_Exit();
 void Wavedash_Init(WavedashData *event_data);
 void Wavedash_Think(WavedashData *event_data, FighterData *hmn_data);
 
-void Dash_Dance_Init(WavedashData *event_data);
+//void Dash_Dance_Init(WavedashData *event_data);
 void Dash_Dance_Think(WavedashData *event_data, FighterData *hmn_data);
 bool Dash_Dance_IsTargetSatisfied(WavedashData *event_data, TargetData *target_data, FighterData *hmn_data, Vec3 pos);
 
-void Crouch_Out_Of_Run_Init(WavedashData *event_data);
+//void Crouch_Out_Of_Run_Init(WavedashData *event_data);
 void Crouch_Out_Of_Run_Think(WavedashData *event_data, FighterData *hmn_data);
 
-void JCGrab_Think(WavedashData *event_data, FighterData *hmn_data);
+void Dash_Forward_Out_Of_Crouch_Think(WavedashData *event_data, FighterData *hmn_data);
 
